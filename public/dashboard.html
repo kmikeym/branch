@@ -25,7 +25,14 @@
       <div id="profile-header" class="profile-header hidden">
         <img id="profile-avatar" class="profile-avatar" src="" alt="Profile">
         <div class="profile-info">
-          <h2 id="profile-username"></h2>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <h2 id="profile-username"></h2>
+            <a id="github-profile-link" href="#" target="_blank" class="github-icon-link" title="View on GitHub">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+              </svg>
+            </a>
+          </div>
           <div class="profile-stats">
             <span id="followers-count">0 followers</span>
             <span>•</span>
@@ -323,6 +330,9 @@
       followersCount.textContent = `${techData.followers?.length || 0} followers`;
       followingCount.textContent = `${techData.following?.length || 0} following`;
 
+      // Set GitHub profile link
+      document.getElementById('github-profile-link').href = `https://github.com/${techData.username}`;
+
       // Apply user type class for CRT glow effect
       profileAvatar.className = 'profile-avatar'; // Reset classes
       if (techData.user_type) {
@@ -386,7 +396,14 @@
         reposContainer.innerHTML = techData.repositories.map((repo, index) => `
           <div class="repo-item">
             <div class="repo-header">
-              <a href="#" class="repo-name" data-repo-index="${index}" onclick="openForkModal(event, ${index})">${repo.name}</a>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <a href="#" class="repo-name" data-repo-index="${index}" onclick="openForkModal(event, ${index})">${repo.name}</a>
+                <a href="${repo.url}" target="_blank" class="github-icon-link" title="View on GitHub" onclick="event.stopPropagation()">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                  </svg>
+                </a>
+              </div>
               ${repo.stars > 0 ? `<span class="repo-stars">⭐ ${repo.stars}</span>` : ''}
             </div>
             ${repo.description ? `<p class="repo-description">${repo.description}</p>` : ''}
