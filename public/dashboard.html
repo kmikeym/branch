@@ -7,14 +7,20 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/dashboard.html" class="logo-link">
+        <span class="logo-icon">🌳</span>
+        <span class="logo-text">Branch</span>
+      </a>
+    </div>
+    <div class="nav-right" id="nav-user-info">
+      <!-- Will be populated by JS -->
+    </div>
+  </nav>
+
   <div class="container">
     <div class="dashboard">
-      <div class="header">
-        <h1>🌳 Branch</h1>
-        <div id="user-info" class="user-info">
-          <!-- Will be populated by JS -->
-        </div>
-      </div>
 
       <div id="profile-header" class="profile-header hidden">
         <img id="profile-avatar" class="profile-avatar" src="" alt="Profile">
@@ -146,11 +152,29 @@
         localStorage.setItem('loggedInUser', username);
       }
 
-      // Show user info
-      document.getElementById('user-info').innerHTML = `
-        <span>@${username}</span>
-        <a href="/" class="logout" onclick="localStorage.removeItem('loggedInUser')">Logout</a>
-      `;
+      // Fetch user info to get avatar
+      try {
+        const techResponse = await fetch(`/api/techstack?username=${username}`);
+        const techData = await techResponse.json();
+
+        // Show user info in navigation
+        document.getElementById('nav-user-info').innerHTML = `
+          <div class="nav-user-info">
+            <img src="${techData.avatar_url || `https://github.com/${username}.png`}" alt="${username}" class="nav-avatar">
+            <span class="nav-username">@${username}</span>
+            <a href="/" class="nav-logout" onclick="localStorage.removeItem('loggedInUser')">Logout</a>
+          </div>
+        `;
+      } catch (error) {
+        // Fallback if we can't get avatar
+        document.getElementById('nav-user-info').innerHTML = `
+          <div class="nav-user-info">
+            <img src="https://github.com/${username}.png" alt="${username}" class="nav-avatar">
+            <span class="nav-username">@${username}</span>
+            <a href="/" class="nav-logout" onclick="localStorage.removeItem('loggedInUser')">Logout</a>
+          </div>
+        `;
+      }
 
       // Try to load existing data first
       await loadExistingData();
