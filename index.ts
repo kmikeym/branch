@@ -2,7 +2,10 @@ import { Database } from "bun:sqlite";
 import type { Server } from "bun";
 
 // Initialize SQLite database
-const db = new Database("branch.db");
+// Use /data/branch.db in production (Railway volume), branch.db in dev
+const dbPath = process.env.RAILWAY_ENVIRONMENT ? "/data/branch.db" : "branch.db";
+const db = new Database(dbPath);
+console.log(`📦 Database path: ${dbPath}`);
 
 // Create tables
 db.run(`

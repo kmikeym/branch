@@ -141,7 +141,7 @@ Railway has native Bun support and is the fastest way to deploy.
    - Size: 1 GB (free tier includes this)
    - Click **"Add Volume"**
    - After volume is created, click on it
-   - Set **Mount Path**: `/app`
+   - Set **Mount Path**: `/data`
    - Click **"Save"**
    - Your app will redeploy automatically
 
