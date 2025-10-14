@@ -797,6 +797,81 @@ body {
   color: #666 !important;
 }
 
+/* Fork Connections */
+.fork-connections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fork-connection-item {
+  background: #fafafa;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e5e5e5;
+  transition: all 0.2s ease;
+}
+
+.fork-connection-item:hover {
+  background: white;
+  border-color: #d0d0d0;
+}
+
+.fork-connection-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #1a1a1a;
+  font-weight: 500;
+  margin-bottom: 12px;
+  transition: opacity 0.2s ease;
+}
+
+.fork-connection-user:hover {
+  opacity: 0.7;
+}
+
+.fork-connection-user img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #e5e5e5;
+  transition: all 0.2s ease;
+}
+
+.fork-connection-user img.authenticated {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+.fork-connection-user img.scanned {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.1);
+}
+
+.fork-connection-user img.unscanned {
+  border-color: #9ca3af;
+}
+
+.fork-connection-repos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-left: 52px;
+}
+
+.fork-repo-tag {
+  display: inline-block;
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  font-size: 0.85em;
+  color: #666;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .hero {
@@ -824,5 +899,9 @@ body {
 
   .stats {
     grid-template-columns: 1fr;
+  }
+
+  .fork-connection-repos {
+    padding-left: 0;
   }
 }

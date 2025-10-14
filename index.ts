@@ -67,9 +67,36 @@ db.run(`
     language TEXT,
     stars INTEGER DEFAULT 0,
     url TEXT,
+    is_fork BOOLEAN DEFAULT 0,
+    fork_parent_owner TEXT,
+    fork_parent_repo TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
     UNIQUE(user_id, name)
+  )
+`);
+
+// Add fork columns to existing repositories table (migration)
+try {
+  db.run(`ALTER TABLE repositories ADD COLUMN is_fork BOOLEAN DEFAULT 0`);
+  db.run(`ALTER TABLE repositories ADD COLUMN fork_parent_owner TEXT`);
+  db.run(`ALTER TABLE repositories ADD COLUMN fork_parent_repo TEXT`);
+  console.log("✅ Added fork columns to repositories");
+} catch (e) {
+  // Columns already exist, ignore error
+}
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS forks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_owner TEXT NOT NULL,
+    repo_name TEXT NOT NULL,
+    forker_username TEXT NOT NULL,
+    forker_user_id INTEGER,
+    forked_at DATETIME,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (forker_user_id) REFERENCES users(id),
+    UNIQUE(repo_owner, repo_name, forker_username)
   )
 `);
 
@@ -300,6 +327,11 @@ const server = Bun.serve({
           default_branch: string;
           stargazers_count: number;
           html_url: string;
+          fork: boolean;
+          parent?: {
+            owner: { login: string };
+            name: string;
+          };
         }>;
 
         // Analyze tech stack
@@ -342,11 +374,11 @@ const server = Bun.serve({
         db.run("DELETE FROM repositories WHERE user_id = ?", [user.id]);
 
         const repoInsertStmt = db.prepare(`
-          INSERT INTO repositories (user_id, name, description, language, stars, url)
-          VALUES (?, ?, ?, ?, ?, ?)
+          INSERT INTO repositories (user_id, name, description, language, stars, url, is_fork, fork_parent_owner, fork_parent_repo)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
-        // Save all repos
+        // Save all repos with fork information
         for (const repo of repos) {
           repoInsertStmt.run(
             user.id,
@@ -354,8 +386,31 @@ const server = Bun.serve({
             repo.description || null,
             repo.language || null,
             repo.stargazers_count,
-            repo.html_url
+            repo.html_url,
+            repo.fork ? 1 : 0,
+            repo.parent?.owner.login || null,
+            repo.parent?.name || null
           );
+        }
+
+        // Track fork relationships in forks table
+        // Clear old fork data for this user
+        db.run("DELETE FROM forks WHERE forker_username = ?", [username]);
+
+        const forkInsertStmt = db.prepare(`
+          INSERT INTO forks (repo_owner, repo_name, forker_username, forker_user_id)
+          VALUES (?, ?, ?, ?)
+        `);
+
+        for (const repo of repos) {
+          if (repo.fork && repo.parent) {
+            forkInsertStmt.run(
+              repo.parent.owner.login,
+              repo.parent.name,
+              username,
+              user.id
+            );
+          }
         }
 
         // Scan for AI assistance mentions
@@ -642,6 +697,44 @@ const server = Bun.serve({
 
       const followingResults = followingStmt.all(username) as any[];
 
+      // Get fork connections - repos this user has forked from others in our system
+      const forkConnectionsStmt = db.prepare(`
+        SELECT DISTINCT
+          f.repo_owner,
+          f.repo_name,
+          u.avatar_url as owner_avatar,
+          CASE
+            WHEN u.access_token IS NOT NULL THEN 'authenticated'
+            WHEN u.scanned_by IS NOT NULL THEN 'scanned'
+            ELSE 'unscanned'
+          END as owner_user_type
+        FROM forks f
+        LEFT JOIN users u ON u.username = f.repo_owner
+        WHERE f.forker_username = ?
+        ORDER BY f.repo_owner ASC, f.repo_name ASC
+      `);
+
+      const forkConnections = forkConnectionsStmt.all(username) as any[];
+
+      // Get users who have forked this user's repos
+      const forkedByStmt = db.prepare(`
+        SELECT DISTINCT
+          f.forker_username,
+          f.repo_name,
+          u.avatar_url,
+          CASE
+            WHEN u.access_token IS NOT NULL THEN 'authenticated'
+            WHEN u.scanned_by IS NOT NULL THEN 'scanned'
+            ELSE 'unscanned'
+          END as user_type
+        FROM forks f
+        LEFT JOIN users u ON u.username = f.forker_username
+        WHERE f.repo_owner = ?
+        ORDER BY f.forker_username ASC, f.repo_name ASC
+      `);
+
+      const forkedBy = forkedByStmt.all(username) as any[];
+
       return new Response(JSON.stringify({
         username: userData.username,
         avatar_url: userData.avatar_url,
@@ -656,6 +749,18 @@ const server = Bun.serve({
         })),
         following: followingResults.map((f: any) => ({
           username: f.github_username,
+          avatar_url: f.avatar_url,
+          user_type: f.user_type
+        })),
+        fork_connections: forkConnections.map((f: any) => ({
+          repo_owner: f.repo_owner,
+          repo_name: f.repo_name,
+          owner_avatar: f.owner_avatar,
+          owner_user_type: f.owner_user_type
+        })),
+        forked_by: forkedBy.map((f: any) => ({
+          username: f.forker_username,
+          repo_name: f.repo_name,
           avatar_url: f.avatar_url,
           user_type: f.user_type
         })),

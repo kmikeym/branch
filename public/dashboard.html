@@ -81,6 +81,20 @@
         <div class="social-section">
           <h2>Social Network</h2>
 
+          <div class="section" id="fork-connections-section">
+            <h3>🍴 Fork Connections (<span id="fork-connections-total">0</span>)</h3>
+            <div id="fork-connections" class="fork-connections">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div class="section" id="forked-by-section">
+            <h3>⭐ Forked By (<span id="forked-by-total">0</span>)</h3>
+            <div id="forked-by" class="social-grid">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
           <div class="section" id="followers-section">
             <h3>👥 Followers (<span id="followers-total">0</span>)</h3>
             <div id="followers" class="social-grid">
@@ -369,6 +383,75 @@
         `).join('');
       } else {
         allTechContainer.innerHTML = '<p class="empty-state">No technologies found</p>';
+      }
+
+      // Display fork connections - repos this user forked from others
+      const forkConnectionsContainer = document.getElementById('fork-connections');
+      const forkConnectionsTotal = document.getElementById('fork-connections-total');
+
+      if (techData.fork_connections && techData.fork_connections.length > 0) {
+        forkConnectionsTotal.textContent = techData.fork_connections.length;
+
+        // Group by owner
+        const groupedForks = {};
+        techData.fork_connections.forEach(fork => {
+          if (!groupedForks[fork.repo_owner]) {
+            groupedForks[fork.repo_owner] = {
+              owner: fork.repo_owner,
+              owner_avatar: fork.owner_avatar,
+              owner_user_type: fork.owner_user_type,
+              repos: []
+            };
+          }
+          groupedForks[fork.repo_owner].repos.push(fork.repo_name);
+        });
+
+        forkConnectionsContainer.innerHTML = Object.values(groupedForks).map(group => `
+          <div class="fork-connection-item">
+            <a href="/dashboard.html?user=${group.owner}" class="fork-connection-user">
+              <img src="${group.owner_avatar || `https://github.com/${group.owner}.png`}" alt="${group.owner}" class="${group.owner_user_type || 'unscanned'}">
+              <span>${group.owner}</span>
+            </a>
+            <div class="fork-connection-repos">
+              ${group.repos.map(repo => `<span class="fork-repo-tag">${repo}</span>`).join('')}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        forkConnectionsContainer.innerHTML = '<p class="empty-state">No fork connections</p>';
+      }
+
+      // Display users who forked this user's repos
+      const forkedByContainer = document.getElementById('forked-by');
+      const forkedByTotal = document.getElementById('forked-by-total');
+
+      if (techData.forked_by && techData.forked_by.length > 0) {
+        // Get unique forkers
+        const uniqueForkers = {};
+        techData.forked_by.forEach(fork => {
+          if (!uniqueForkers[fork.username]) {
+            uniqueForkers[fork.username] = {
+              username: fork.username,
+              avatar_url: fork.avatar_url,
+              user_type: fork.user_type,
+              repos: []
+            };
+          }
+          uniqueForkers[fork.username].repos.push(fork.repo_name);
+        });
+
+        const forkersArray = Object.values(uniqueForkers);
+        forkedByTotal.textContent = forkersArray.length;
+
+        forkedByContainer.innerHTML = forkersArray.map(forker => `
+          <a href="/dashboard.html?user=${forker.username}" class="social-card" title="${forker.username} (forked ${forker.repos.join(', ')})">
+            <img src="${forker.avatar_url}" alt="${forker.username}" class="${forker.user_type || 'unscanned'}">
+            <span>${forker.username}</span>
+            <span style="font-size: 0.8em; color: #666;">${forker.repos.length} repo${forker.repos.length !== 1 ? 's' : ''}</span>
+          </a>
+        `).join('');
+      } else {
+        forkedByContainer.innerHTML = '<p class="empty-state">No forks</p>';
       }
 
       // Display followers
