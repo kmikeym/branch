@@ -770,6 +770,103 @@ const server = Bun.serve({
       return new Response(file);
     }
 
+    if (url.pathname === "/api/tech") {
+      // Get all repos and users for a specific technology
+      const tag = url.searchParams.get("tag");
+
+      if (!tag) {
+        return new Response(JSON.stringify({ error: "Missing tag parameter" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      try {
+        // Find repos with this technology (from tech_stack, ai_assistance, or services)
+        const reposStmt = db.prepare(`
+          SELECT DISTINCT
+            r.name,
+            r.description,
+            r.url,
+            r.stars,
+            u.username,
+            u.avatar_url
+          FROM repositories r
+          JOIN users u ON r.user_id = u.id
+          WHERE r.user_id IN (
+            SELECT DISTINCT user_id FROM tech_stack WHERE technology = ?
+            UNION
+            SELECT DISTINCT user_id FROM ai_assistance WHERE ai_tool = ?
+            UNION
+            SELECT DISTINCT user_id FROM services WHERE service_name = ?
+          )
+          AND (
+            r.language = ?
+            OR r.user_id IN (SELECT user_id FROM tech_stack WHERE technology = ?)
+          )
+          ORDER BY r.stars DESC, r.name ASC
+        `);
+
+        const repos = reposStmt.all(tag, tag, tag, tag, tag) as any[];
+
+        // Find users who use this technology
+        const usersStmt = db.prepare(`
+          SELECT DISTINCT
+            u.username,
+            u.avatar_url,
+            COUNT(DISTINCT r.id) as repo_count,
+            CASE
+              WHEN u.access_token IS NOT NULL THEN 'authenticated'
+              WHEN u.scanned_by IS NOT NULL THEN 'scanned'
+              ELSE 'unscanned'
+            END as user_type
+          FROM users u
+          LEFT JOIN repositories r ON r.user_id = u.id
+          WHERE u.id IN (
+            SELECT DISTINCT user_id FROM tech_stack WHERE technology = ?
+            UNION
+            SELECT DISTINCT user_id FROM ai_assistance WHERE ai_tool = ?
+            UNION
+            SELECT DISTINCT user_id FROM services WHERE service_name = ?
+          )
+          GROUP BY u.id, u.username, u.avatar_url, u.access_token, u.scanned_by
+          ORDER BY repo_count DESC, u.username ASC
+        `);
+
+        const users = usersStmt.all(tag, tag, tag) as any[];
+
+        return new Response(JSON.stringify({
+          tag,
+          repositories: repos.map(r => ({
+            name: r.name,
+            description: r.description,
+            url: r.url,
+            stars: r.stars,
+            username: r.username
+          })),
+          users: users.map(u => ({
+            username: u.username,
+            avatar_url: u.avatar_url,
+            repo_count: u.repo_count,
+            user_type: u.user_type
+          }))
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Tech query error:", error);
+        return new Response(JSON.stringify({ error: "Failed to fetch technology data" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/tech.html") {
+      const file = Bun.file("./public/tech.html");
+      return new Response(file);
+    }
+
     return new Response("Not Found", { status: 404 });
   }
 });

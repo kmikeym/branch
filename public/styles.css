@@ -309,8 +309,65 @@ body {
 /* Tech Stack */
 .tech-stack h2 {
   font-size: 1.8em;
-  margin-bottom: 30px;
-  color: #24292e;
+  margin-bottom: 24px;
+  color: #1a1a1a;
+}
+
+.tech-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tech-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 0.95em;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: 1px solid;
+}
+
+.tech-tag-gray {
+  background: #fafafa;
+  color: #1a1a1a;
+  border-color: #e5e5e5;
+}
+
+.tech-tag-gray:hover {
+  background: white;
+  border-color: #1a1a1a;
+}
+
+.tech-tag-blue {
+  background: #eff6ff;
+  color: #1e40af;
+  border-color: #bfdbfe;
+}
+
+.tech-tag-blue:hover {
+  background: #dbeafe;
+  border-color: #3b82f6;
+}
+
+.tech-tag-green {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+
+.tech-tag-green:hover {
+  background: #dcfce7;
+  border-color: #22c55e;
+}
+
+.tech-tag-count {
+  font-size: 0.85em;
+  opacity: 0.7;
 }
 
 .section {

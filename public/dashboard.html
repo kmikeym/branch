@@ -73,33 +73,8 @@
 
         <div class="tech-stack">
           <h2>Tech Stack</h2>
-
-          <div class="section">
-            <h3>Languages</h3>
-            <div id="languages" class="tech-list">
-              <!-- Populated by JS -->
-            </div>
-          </div>
-
-          <div class="section">
-            <h3>Frameworks & Tools</h3>
-            <div id="frameworks" class="tech-list">
-              <!-- Populated by JS -->
-            </div>
-          </div>
-
-          <div class="section" id="ai-section">
-            <h3>🤖 AI Assistance Detected</h3>
-            <div id="ai-assistance" class="tech-list">
-              <!-- Populated by JS -->
-            </div>
-          </div>
-
-          <div class="section" id="services-section">
-            <h3>☁️ Services & Platforms</h3>
-            <div id="services" class="tech-list">
-              <!-- Populated by JS -->
-            </div>
+          <div id="all-tech" class="tech-tags">
+            <!-- Populated by JS -->
           </div>
         </div>
 
@@ -334,82 +309,66 @@
         reposContainer.innerHTML = '<p class="empty-state">No repositories found</p>';
       }
 
-      // Separate languages and frameworks
-      const languages = techData.tech_stack.filter(t => t.category === 'language');
-      const frameworks = techData.tech_stack.filter(t => t.category === 'framework');
+      // Consolidate all tech into one array with type information
+      const allTech = [];
 
-      // Display languages
-      const languagesContainer = document.getElementById('languages');
-      languagesContainer.innerHTML = languages.map(tech => `
-        <div class="tech-item">
-          <div class="tech-info">
-            <span class="tech-name">${tech.technology}</span>
-            <span class="tech-count">${tech.repo_count} ${tech.repo_count === 1 ? 'repo' : 'repos'}</span>
-          </div>
-          <div class="tech-bar">
-            <div class="tech-bar-fill" style="width: ${(tech.repo_count / scanData.repos_analyzed) * 100}%"></div>
-          </div>
-        </div>
-      `).join('');
+      // Add languages (gray)
+      techData.tech_stack.filter(t => t.category === 'language').forEach(tech => {
+        allTech.push({
+          name: tech.technology,
+          count: tech.repo_count,
+          type: 'language',
+          color: 'gray'
+        });
+      });
 
-      // Display frameworks
-      const frameworksContainer = document.getElementById('frameworks');
-      if (frameworks.length === 0) {
-        frameworksContainer.innerHTML = '<p class="empty-state">No framework tags found. Add topics to your repos!</p>';
-      } else {
-        frameworksContainer.innerHTML = frameworks.map(tech => `
-          <div class="tech-item">
-            <div class="tech-info">
-              <span class="tech-name">${tech.technology}</span>
-              <span class="tech-count">${tech.repo_count} ${tech.repo_count === 1 ? 'repo' : 'repos'}</span>
-            </div>
-            <div class="tech-bar">
-              <div class="tech-bar-fill" style="width: ${(tech.repo_count / scanData.repos_analyzed) * 100}%"></div>
-            </div>
-          </div>
-        `).join('');
+      // Add frameworks (gray)
+      techData.tech_stack.filter(t => t.category === 'framework').forEach(tech => {
+        allTech.push({
+          name: tech.technology,
+          count: tech.repo_count,
+          type: 'framework',
+          color: 'gray'
+        });
+      });
+
+      // Add AI tools (blue)
+      if (techData.ai_assistance) {
+        techData.ai_assistance.forEach(ai => {
+          allTech.push({
+            name: ai.tool,
+            count: ai.repo_count,
+            type: 'ai',
+            color: 'blue'
+          });
+        });
       }
 
-      // Display AI assistance
-      const aiContainer = document.getElementById('ai-assistance');
-      const aiSection = document.getElementById('ai-section');
-
-      if (techData.ai_assistance && techData.ai_assistance.length > 0) {
-        aiSection.classList.remove('hidden');
-        aiContainer.innerHTML = techData.ai_assistance.map(ai => `
-          <div class="tech-item ai-item">
-            <div class="tech-info">
-              <span class="tech-name">${ai.tool}</span>
-              <span class="tech-count">${ai.repo_count} ${ai.repo_count === 1 ? 'repo' : 'repos'} • ${ai.mentions} ${ai.mentions === 1 ? 'mention' : 'mentions'}</span>
-            </div>
-            <div class="tech-bar">
-              <div class="tech-bar-fill ai-bar-fill" style="width: ${(ai.repo_count / scanData.repos_analyzed) * 100}%"></div>
-            </div>
-          </div>
-        `).join('');
-      } else {
-        aiSection.classList.add('hidden');
+      // Add services (green)
+      if (techData.services) {
+        techData.services.forEach(service => {
+          allTech.push({
+            name: service.service,
+            count: service.repo_count,
+            type: 'service',
+            color: 'green'
+          });
+        });
       }
 
-      // Display services
-      const servicesContainer = document.getElementById('services');
-      const servicesSection = document.getElementById('services-section');
+      // Sort by count descending
+      allTech.sort((a, b) => b.count - a.count);
 
-      if (techData.services && techData.services.length > 0) {
-        servicesSection.classList.remove('hidden');
-        servicesContainer.innerHTML = techData.services.map(service => `
-          <div class="tech-item service-item">
-            <div class="tech-info">
-              <span class="tech-name">${service.service}</span>
-              <span class="tech-count">${service.repo_count} ${service.repo_count === 1 ? 'repo' : 'repos'} • ${service.mentions} ${service.mentions === 1 ? 'mention' : 'mentions'}</span>
-            </div>
-            <div class="tech-bar">
-              <div class="tech-bar-fill service-bar-fill" style="width: ${(service.repo_count / scanData.repos_analyzed) * 100}%"></div>
-            </div>
-          </div>
+      // Display all tech as clickable tags
+      const allTechContainer = document.getElementById('all-tech');
+      if (allTech.length > 0) {
+        allTechContainer.innerHTML = allTech.map(tech => `
+          <a href="/tech.html?tag=${encodeURIComponent(tech.name)}" class="tech-tag tech-tag-${tech.color}">
+            ${tech.name} <span class="tech-tag-count">${tech.count}</span>
+          </a>
         `).join('');
       } else {
-        servicesSection.classList.add('hidden');
+        allTechContainer.innerHTML = '<p class="empty-state">No technologies found</p>';
       }
 
       // Display followers
