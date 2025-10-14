@@ -74,6 +74,19 @@ db.run(`
   )
 `);
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS social_connections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    github_username TEXT NOT NULL,
+    avatar_url TEXT,
+    connection_type TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(user_id, github_username, connection_type)
+  )
+`);
+
 console.log("✅ Database initialized");
 
 // Server configuration
@@ -375,6 +388,56 @@ const server = Bun.serve({
           servicesInsertStmt.run(user.id, serviceName, data.repos.size, data.mentions);
         }
 
+        // Fetch followers and following
+        try {
+          // Clear old social connections
+          db.run("DELETE FROM social_connections WHERE user_id = ?", [user.id]);
+
+          const socialInsertStmt = db.prepare(`
+            INSERT INTO social_connections (user_id, github_username, avatar_url, connection_type)
+            VALUES (?, ?, ?, ?)
+          `);
+
+          // Fetch followers (limit to 100)
+          const followersResponse = await fetch(
+            `https://api.github.com/users/${username}/followers?per_page=100`,
+            {
+              headers: {
+                "Authorization": `Bearer ${user.access_token}`,
+                "Accept": "application/vnd.github.v3+json"
+              }
+            }
+          );
+
+          if (followersResponse.ok) {
+            const followers = await followersResponse.json() as Array<{ login: string; avatar_url: string }>;
+            for (const follower of followers) {
+              socialInsertStmt.run(user.id, follower.login, follower.avatar_url, "follower");
+            }
+          }
+
+          // Fetch following (limit to 100)
+          const followingResponse = await fetch(
+            `https://api.github.com/users/${username}/following?per_page=100`,
+            {
+              headers: {
+                "Authorization": `Bearer ${user.access_token}`,
+                "Accept": "application/vnd.github.v3+json"
+              }
+            }
+          );
+
+          if (followingResponse.ok) {
+            const following = await followingResponse.json() as Array<{ login: string; avatar_url: string }>;
+            for (const person of following) {
+              socialInsertStmt.run(user.id, person.login, person.avatar_url, "following");
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching social connections:", error);
+          // Continue even if social connections fail
+        }
+
         // Update last scan time
         db.run("UPDATE users SET last_scan = CURRENT_TIMESTAMP WHERE id = ?", [user.id]);
 
@@ -464,11 +527,41 @@ const server = Bun.serve({
 
       const reposResults = reposStmt.all(username) as any[];
 
+      // Get followers
+      const followersStmt = db.prepare(`
+        SELECT github_username, avatar_url
+        FROM social_connections
+        WHERE user_id = (SELECT id FROM users WHERE username = ?)
+          AND connection_type = 'follower'
+        ORDER BY github_username ASC
+      `);
+
+      const followersResults = followersStmt.all(username) as any[];
+
+      // Get following
+      const followingStmt = db.prepare(`
+        SELECT github_username, avatar_url
+        FROM social_connections
+        WHERE user_id = (SELECT id FROM users WHERE username = ?)
+          AND connection_type = 'following'
+        ORDER BY github_username ASC
+      `);
+
+      const followingResults = followingStmt.all(username) as any[];
+
       return new Response(JSON.stringify({
         username: userData.username,
         avatar_url: userData.avatar_url,
         location: userData.location,
         last_scan: userData.last_scan,
+        followers: followersResults.map((f: any) => ({
+          username: f.github_username,
+          avatar_url: f.avatar_url
+        })),
+        following: followingResults.map((f: any) => ({
+          username: f.github_username,
+          avatar_url: f.avatar_url
+        })),
         repositories: reposResults.map((r: any) => ({
           name: r.name,
           description: r.description,

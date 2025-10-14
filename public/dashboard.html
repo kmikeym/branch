@@ -16,6 +16,18 @@
         </div>
       </div>
 
+      <div id="profile-header" class="profile-header hidden">
+        <img id="profile-avatar" class="profile-avatar" src="" alt="Profile">
+        <div class="profile-info">
+          <h2 id="profile-username"></h2>
+          <div class="profile-stats">
+            <span id="followers-count">0 followers</span>
+            <span>•</span>
+            <span id="following-count">0 following</span>
+          </div>
+        </div>
+      </div>
+
       <div id="loading" class="loading">
         <p>🔍 Scanning your repositories...</p>
         <p class="loading-subtext">This may take a moment</p>
@@ -79,6 +91,24 @@
           <div class="section" id="services-section">
             <h3>☁️ Services & Platforms</h3>
             <div id="services" class="tech-list">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <div class="social-section">
+          <h2>Social Network</h2>
+
+          <div class="section" id="followers-section">
+            <h3>👥 Followers (<span id="followers-total">0</span>)</h3>
+            <div id="followers" class="social-grid">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div class="section" id="following-section">
+            <h3>➡️ Following (<span id="following-total">0</span>)</h3>
+            <div id="following" class="social-grid">
               <!-- Populated by JS -->
             </div>
           </div>
@@ -148,6 +178,19 @@
     function displayResults(scanData, techData) {
       document.getElementById('loading').classList.add('hidden');
       document.getElementById('results').classList.remove('hidden');
+
+      // Display profile header
+      const profileHeader = document.getElementById('profile-header');
+      const profileAvatar = document.getElementById('profile-avatar');
+      const profileUsername = document.getElementById('profile-username');
+      const followersCount = document.getElementById('followers-count');
+      const followingCount = document.getElementById('following-count');
+
+      profileAvatar.src = techData.avatar_url;
+      profileUsername.textContent = `@${techData.username}`;
+      followersCount.textContent = `${techData.followers?.length || 0} followers`;
+      followingCount.textContent = `${techData.following?.length || 0} following`;
+      profileHeader.classList.remove('hidden');
 
       // Display location
       const locationText = document.getElementById('location-text');
@@ -257,6 +300,38 @@
         `).join('');
       } else {
         servicesSection.classList.add('hidden');
+      }
+
+      // Display followers
+      const followersContainer = document.getElementById('followers');
+      const followersTotal = document.getElementById('followers-total');
+
+      if (techData.followers && techData.followers.length > 0) {
+        followersTotal.textContent = techData.followers.length;
+        followersContainer.innerHTML = techData.followers.map(follower => `
+          <a href="https://github.com/${follower.username}" target="_blank" class="social-card" title="${follower.username}">
+            <img src="${follower.avatar_url}" alt="${follower.username}">
+            <span>${follower.username}</span>
+          </a>
+        `).join('');
+      } else {
+        followersContainer.innerHTML = '<p class="empty-state">No followers</p>';
+      }
+
+      // Display following
+      const followingContainer = document.getElementById('following');
+      const followingTotal = document.getElementById('following-total');
+
+      if (techData.following && techData.following.length > 0) {
+        followingTotal.textContent = techData.following.length;
+        followingContainer.innerHTML = techData.following.map(person => `
+          <a href="https://github.com/${person.username}" target="_blank" class="social-card" title="${person.username}">
+            <img src="${person.avatar_url}" alt="${person.username}">
+            <span>${person.username}</span>
+          </a>
+        `).join('');
+      } else {
+        followingContainer.innerHTML = '<p class="empty-state">Not following anyone</p>';
       }
 
       // Setup rescan button
