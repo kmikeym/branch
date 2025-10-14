@@ -334,9 +334,7 @@
       if (techData.has_more_repos) {
         reposHeader.textContent = `📦 Repositories (${techData.repos_scanned} of ${techData.total_repos})`;
         scanMoreBtn.classList.remove('hidden');
-        scanMoreBtn.onclick = () => {
-          alert('Full repository scanning coming soon! For now, we scan your 20 most recently updated repos for faster performance.');
-        };
+        scanMoreBtn.onclick = scanMoreRepos;
       } else if (techData.total_repos > 0) {
         reposHeader.textContent = `📦 Repositories (${techData.total_repos})`;
         scanMoreBtn.classList.add('hidden');
@@ -597,6 +595,38 @@
           alert('Failed to update location');
         }
       };
+    }
+
+    async function scanMoreRepos() {
+      const scanMoreBtn = document.getElementById('scan-more-btn');
+      const originalText = scanMoreBtn.textContent;
+
+      scanMoreBtn.textContent = 'Scanning...';
+      scanMoreBtn.disabled = true;
+
+      try {
+        const scanner = localStorage.getItem('loggedInUser');
+        let scanUrl = `/api/scan-more?username=${username}`;
+        if (scanner && scanner !== username) {
+          scanUrl += `&scanner=${scanner}`;
+        }
+
+        const response = await fetch(scanUrl);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Scan failed');
+        }
+
+        // Reload the page data to show new repos
+        await loadExistingData();
+
+      } catch (error) {
+        console.error(error);
+        alert(`Failed to scan more repos: ${error.message}`);
+        scanMoreBtn.textContent = originalText;
+        scanMoreBtn.disabled = false;
+      }
     }
 
     function showError(message) {

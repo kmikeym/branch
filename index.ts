@@ -603,6 +603,270 @@ const server = Bun.serve({
       }
     }
 
+    if (url.pathname === "/api/scan-more") {
+      // Scan additional repositories (incremental scan without clearing existing data)
+      const username = url.searchParams.get("username");
+      const scannerUsername = url.searchParams.get("scanner");
+
+      if (!username) {
+        return new Response(JSON.stringify({ error: "Missing username" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      try {
+        // Get the scanner's access token
+        let accessToken = null;
+        if (scannerUsername) {
+          const scannerStmt = db.prepare("SELECT access_token FROM users WHERE username = ?");
+          const scanner = scannerStmt.get(scannerUsername) as any;
+          if (scanner && scanner.access_token) {
+            accessToken = scanner.access_token;
+          }
+        }
+
+        if (!accessToken) {
+          const userStmt = db.prepare("SELECT access_token FROM users WHERE username = ?");
+          const user = userStmt.get(username) as any;
+          if (user && user.access_token) {
+            accessToken = user.access_token;
+          }
+        }
+
+        if (!accessToken) {
+          return new Response(JSON.stringify({
+            error: "Authentication required"
+          }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Get user
+        const user = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as any;
+        if (!user) {
+          return new Response(JSON.stringify({ error: "User not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Get current repo count in database
+        const currentRepoCount = db.prepare("SELECT COUNT(*) as count FROM repositories WHERE user_id = ?").get(user.id) as any;
+        const alreadyScanned = currentRepoCount.count;
+
+        // Fetch next batch of repos (page 2: repos 21-40)
+        const page = Math.floor(alreadyScanned / 20) + 1;
+        const reposResponse = await fetch(
+          `https://api.github.com/users/${username}/repos?per_page=20&page=${page}&sort=updated&direction=desc`,
+          {
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Accept": "application/vnd.github.v3+json"
+            }
+          }
+        );
+
+        const repos = await reposResponse.json() as Array<{
+          name: string;
+          description: string | null;
+          language: string | null;
+          topics: string[];
+          stargazers_count: number;
+          html_url: string;
+          fork: boolean;
+          parent?: {
+            owner: { login: string };
+            name: string;
+          };
+        }>;
+
+        if (repos.length === 0) {
+          return new Response(JSON.stringify({
+            success: true,
+            message: "No more repos to scan",
+            repos_scanned: alreadyScanned,
+            total_repos: user.total_repos
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Insert new repos (using INSERT OR IGNORE to skip duplicates)
+        const repoInsertStmt = db.prepare(`
+          INSERT OR IGNORE INTO repositories (user_id, name, description, language, stars, url, is_fork, fork_parent_owner, fork_parent_repo)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        for (const repo of repos) {
+          repoInsertStmt.run(
+            user.id,
+            repo.name,
+            repo.description || null,
+            repo.language || null,
+            repo.stargazers_count,
+            repo.html_url,
+            repo.fork ? 1 : 0,
+            repo.parent?.owner.login || null,
+            repo.parent?.name || null
+          );
+        }
+
+        // Update fork relationships incrementally
+        const forkInsertStmt = db.prepare(`
+          INSERT OR IGNORE INTO forks (repo_owner, repo_name, forker_username, forker_user_id)
+          VALUES (?, ?, ?, ?)
+        `);
+
+        for (const repo of repos) {
+          if (repo.fork && repo.parent) {
+            forkInsertStmt.run(
+              repo.parent.owner.login,
+              repo.parent.name,
+              username,
+              user.id
+            );
+          }
+        }
+
+        // Scan READMEs for new repos
+        const aiTools = {
+          "Claude Code": /claude[- ]code/gi,
+          "Claude": /\bclaude\b/gi,
+          "ChatGPT": /chatgpt|chat[- ]gpt/gi,
+          "GitHub Copilot": /copilot/gi,
+          "Cursor": /cursor ai|cursor\.ai/gi,
+          "AI Assisted": /ai[- ]assisted|ai[- ]generated|with ai|using ai/gi
+        };
+
+        const services = {
+          "Railway": /railway\.app|railway\.com|\brailway\b/gi,
+          "Cloudflare": /cloudflare|workers\.dev|pages\.dev/gi,
+          "Vercel": /vercel\.app|vercel\.com|\bvercel\b/gi,
+          "Netlify": /netlify\.app|netlify\.com|\bnetlify\b/gi,
+          "AWS": /amazonaws\.com|aws\.amazon|\baws\b/gi,
+          "Google Cloud": /cloud\.google|gcp|google cloud/gi,
+          "Heroku": /heroku\.com|heroku\.app|\bheroku\b/gi,
+          "DigitalOcean": /digitalocean\.com|\bdigitalocean\b/gi,
+          "Render": /render\.com|\brender\b/gi,
+          "Fly.io": /fly\.io|\bfly\.io\b/gi,
+          "Supabase": /supabase\.co|supabase\.com|\bsupabase\b/gi,
+          "Firebase": /firebase\.com|firebase\.google|\bfirebase\b/gi,
+          "PlanetScale": /planetscale\.com|\bplanetscale\b/gi,
+          "Neon": /neon\.tech|\bneon\b/gi
+        };
+
+        const aiInsertStmt = db.prepare(`
+          INSERT OR IGNORE INTO ai_assistance (user_id, repo_name, ai_tool, mention_count, found_in)
+          VALUES (?, ?, ?, ?, ?)
+        `);
+
+        const serviceCountMap = new Map<string, { repos: Set<string>; mentions: number }>();
+
+        for (const repo of repos) {
+          try {
+            const readmeResponse = await fetch(
+              `https://api.github.com/repos/${username}/${repo.name}/readme`,
+              {
+                headers: {
+                  "Authorization": `Bearer ${accessToken}`,
+                  "Accept": "application/vnd.github.v3+json"
+                }
+              }
+            );
+
+            if (readmeResponse.ok) {
+              const readmeData = await readmeResponse.json() as { content: string; encoding: string };
+              const readmeContent = Buffer.from(readmeData.content, 'base64').toString('utf-8');
+              const readmeContentLower = readmeContent.toLowerCase();
+
+              for (const [toolName, pattern] of Object.entries(aiTools)) {
+                const matches = readmeContentLower.match(pattern);
+                if (matches && matches.length > 0) {
+                  aiInsertStmt.run(user.id, repo.name, toolName, matches.length, "README");
+                }
+              }
+
+              for (const [serviceName, pattern] of Object.entries(services)) {
+                const matches = readmeContentLower.match(pattern);
+                if (matches && matches.length > 0) {
+                  const existing = serviceCountMap.get(serviceName);
+                  if (existing) {
+                    existing.repos.add(repo.name);
+                    existing.mentions += matches.length;
+                  } else {
+                    serviceCountMap.set(serviceName, {
+                      repos: new Set([repo.name]),
+                      mentions: matches.length
+                    });
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            continue;
+          }
+        }
+
+        // Update tech stack counts (recalculate from all repos)
+        const allRepos = db.prepare("SELECT * FROM repositories WHERE user_id = ?").all(user.id) as any[];
+        const techCount = new Map<string, { category: string; count: number }>();
+
+        allRepos.forEach((repo: any) => {
+          if (repo.language) {
+            const existing = techCount.get(repo.language);
+            techCount.set(repo.language, {
+              category: "language",
+              count: existing ? existing.count + 1 : 1
+            });
+          }
+        });
+
+        // Clear and rebuild tech stack
+        db.run("DELETE FROM tech_stack WHERE user_id = ?", [user.id]);
+        const techInsertStmt = db.prepare(`
+          INSERT INTO tech_stack (user_id, technology, category, repo_count)
+          VALUES (?, ?, ?, ?)
+        `);
+
+        for (const [tech, data] of techCount.entries()) {
+          techInsertStmt.run(user.id, tech, data.category, data.count);
+        }
+
+        // Update services (merge new data with existing)
+        for (const [serviceName, data] of serviceCountMap.entries()) {
+          db.prepare(`
+            INSERT INTO services (user_id, service_name, repo_count, mention_count)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, service_name) DO UPDATE SET
+              repo_count = repo_count + excluded.repo_count,
+              mention_count = mention_count + excluded.mention_count
+          `).run(user.id, serviceName, data.repos.size, data.mentions);
+        }
+
+        // Get updated repo count
+        const updatedCount = db.prepare("SELECT COUNT(*) as count FROM repositories WHERE user_id = ?").get(user.id) as any;
+
+        return new Response(JSON.stringify({
+          success: true,
+          repos_added: repos.length,
+          repos_scanned: updatedCount.count,
+          total_repos: user.total_repos,
+          has_more_repos: user.total_repos > updatedCount.count
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+
+      } catch (error) {
+        console.error("Scan more error:", error);
+        return new Response(JSON.stringify({ error: "Scan failed" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
     if (url.pathname === "/api/techstack") {
       // Get tech stack for user
       const username = url.searchParams.get("username");
