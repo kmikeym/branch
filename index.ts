@@ -214,12 +214,43 @@ const server = Bun.serve({
       }
 
       try {
+        // Get the scanner's access token for authenticated API calls
+        let accessToken = null;
+        if (scannerUsername) {
+          const scannerStmt = db.prepare("SELECT access_token FROM users WHERE username = ?");
+          const scanner = scannerStmt.get(scannerUsername) as any;
+          if (scanner && scanner.access_token) {
+            accessToken = scanner.access_token;
+          }
+        }
+
+        // If no scanner token, try to get target user's token (for self-scan)
+        if (!accessToken) {
+          const userStmt = db.prepare("SELECT access_token FROM users WHERE username = ?");
+          const user = userStmt.get(username) as any;
+          if (user && user.access_token) {
+            accessToken = user.access_token;
+          }
+        }
+
+        // Require authentication for scanning
+        if (!accessToken) {
+          return new Response(JSON.stringify({
+            error: "Authentication required. Please log in to scan profiles.",
+            message: "Login with GitHub to get 5000 API requests per hour instead of 60."
+          }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
         // Check if target user exists, if not create a placeholder
         let targetUser = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as any;
         if (!targetUser) {
-          // Fetch basic user info from GitHub (public API, no auth needed)
+          // Fetch basic user info from GitHub using authenticated API
           const userInfoResponse = await fetch(`https://api.github.com/users/${username}`, {
             headers: {
+              "Authorization": `Bearer ${accessToken}`,
               "Accept": "application/vnd.github.v3+json"
             }
           });
@@ -250,11 +281,12 @@ const server = Bun.serve({
 
         const user = targetUser;
 
-        // Fetch all repos (public API, no auth needed)
+        // Fetch all repos with authentication
         const reposResponse = await fetch(
           `https://api.github.com/users/${username}/repos?per_page=100`,
           {
             headers: {
+              "Authorization": `Bearer ${accessToken}`,
               "Accept": "application/vnd.github.v3+json"
             }
           }
@@ -368,11 +400,12 @@ const server = Bun.serve({
         // Scan each repo's README
         for (const repo of repos) {
           try {
-            // Try to fetch README (public API, no auth needed)
+            // Try to fetch README with authentication
             const readmeResponse = await fetch(
               `https://api.github.com/repos/${username}/${repo.name}/readme`,
               {
                 headers: {
+                  "Authorization": `Bearer ${accessToken}`,
                   "Accept": "application/vnd.github.v3+json"
                 }
               }
@@ -434,11 +467,12 @@ const server = Bun.serve({
             VALUES (?, ?, ?, ?)
           `);
 
-          // Fetch followers (limit to 100, public API, no auth needed)
+          // Fetch followers (limit to 100) with authentication
           const followersResponse = await fetch(
             `https://api.github.com/users/${username}/followers?per_page=100`,
             {
               headers: {
+                "Authorization": `Bearer ${accessToken}`,
                 "Accept": "application/vnd.github.v3+json"
               }
             }
@@ -451,11 +485,12 @@ const server = Bun.serve({
             }
           }
 
-          // Fetch following (limit to 100, public API, no auth needed)
+          // Fetch following (limit to 100) with authentication
           const followingResponse = await fetch(
             `https://api.github.com/users/${username}/following?per_page=100`,
             {
               headers: {
+                "Authorization": `Bearer ${accessToken}`,
                 "Accept": "application/vnd.github.v3+json"
               }
             }
