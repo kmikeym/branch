@@ -127,6 +127,43 @@
     </div>
   </div>
 
+  <!-- Fork Connections Modal -->
+  <div id="fork-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-repo-name"></h2>
+        <button class="modal-close" onclick="closeForkModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="modal-repo-info" style="margin-bottom: 24px;">
+          <p id="modal-repo-description" style="color: #666; margin-bottom: 12px;"></p>
+          <div style="display: flex; gap: 16px; font-size: 0.9em; color: #666;">
+            <span id="modal-repo-language"></span>
+            <span id="modal-repo-stars"></span>
+          </div>
+        </div>
+
+        <div id="modal-forked-from" class="modal-section hidden">
+          <h3>Forked From</h3>
+          <div id="modal-forked-from-content"></div>
+        </div>
+
+        <div id="modal-forked-by" class="modal-section hidden">
+          <h3>Forked By</h3>
+          <div id="modal-forked-by-content" class="social-grid"></div>
+        </div>
+
+        <div id="modal-no-connections" class="empty-state hidden">
+          No fork connections found for this repository
+        </div>
+
+        <div style="margin-top: 24px;">
+          <a id="modal-github-link" href="#" target="_blank" class="btn-secondary">View on GitHub</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const username = urlParams.get('user');
@@ -346,16 +383,20 @@
       // Display repositories
       const reposContainer = document.getElementById('repositories');
       if (techData.repositories && techData.repositories.length > 0) {
-        reposContainer.innerHTML = techData.repositories.map(repo => `
+        reposContainer.innerHTML = techData.repositories.map((repo, index) => `
           <div class="repo-item">
             <div class="repo-header">
-              <a href="${repo.url}" target="_blank" class="repo-name">${repo.name}</a>
+              <a href="#" class="repo-name" data-repo-index="${index}" onclick="openForkModal(event, ${index})">${repo.name}</a>
               ${repo.stars > 0 ? `<span class="repo-stars">⭐ ${repo.stars}</span>` : ''}
             </div>
             ${repo.description ? `<p class="repo-description">${repo.description}</p>` : ''}
             ${repo.language ? `<span class="repo-language">${repo.language}</span>` : ''}
           </div>
         `).join('');
+
+        // Store repos data globally for modal access
+        window.currentReposData = techData.repositories;
+        window.currentUsername = username;
       } else {
         reposContainer.innerHTML = '<p class="empty-state">No repositories found</p>';
       }
@@ -635,6 +676,91 @@
       document.getElementById('error').classList.remove('hidden');
       document.getElementById('error-message').textContent = message;
     }
+
+    // Fork modal functions
+    async function openForkModal(event, repoIndex) {
+      event.preventDefault();
+
+      const repo = window.currentReposData[repoIndex];
+      const owner = window.currentUsername;
+
+      // Populate modal with repo info
+      document.getElementById('modal-repo-name').textContent = repo.name;
+      document.getElementById('modal-repo-description').textContent = repo.description || 'No description';
+      document.getElementById('modal-repo-language').textContent = repo.language ? `📝 ${repo.language}` : '';
+      document.getElementById('modal-repo-stars').textContent = repo.stars > 0 ? `⭐ ${repo.stars}` : '';
+      document.getElementById('modal-github-link').href = repo.url;
+
+      // Show loading state
+      document.getElementById('modal-forked-from').classList.add('hidden');
+      document.getElementById('modal-forked-by').classList.add('hidden');
+      document.getElementById('modal-no-connections').classList.remove('hidden');
+
+      // Fetch fork data
+      try {
+        const response = await fetch(`/api/repo-forks?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo.name)}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load fork data');
+        }
+
+        let hasConnections = false;
+
+        // Display "Forked From" if this is a fork
+        if (data.forked_from) {
+          hasConnections = true;
+          document.getElementById('modal-forked-from').classList.remove('hidden');
+          document.getElementById('modal-forked-from-content').innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #f5f5f5; border-radius: 8px;">
+              <a href="/dashboard.html?user=${data.forked_from.owner}" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: #1a1a1a;">
+                <img src="${data.forked_from.avatar_url || `https://github.com/${data.forked_from.owner}.png`}"
+                     alt="${data.forked_from.owner}"
+                     class="${data.forked_from.user_type || 'unscanned'}"
+                     style="width: 32px; height: 32px; border-radius: 50%;">
+                <span style="font-weight: 500;">${data.forked_from.owner}/${data.forked_from.repo}</span>
+              </a>
+            </div>
+          `;
+        }
+
+        // Display "Forked By" if others have forked this repo
+        if (data.forked_by && data.forked_by.length > 0) {
+          hasConnections = true;
+          document.getElementById('modal-forked-by').classList.remove('hidden');
+          document.getElementById('modal-forked-by-content').innerHTML = data.forked_by.map(user => `
+            <a href="/dashboard.html?user=${user.username}" class="social-card" title="${user.username}">
+              <img src="${user.avatar_url || `https://github.com/${user.username}.png`}"
+                   alt="${user.username}"
+                   class="${user.user_type || 'unscanned'}">
+              <span>${user.username}</span>
+            </a>
+          `).join('');
+        }
+
+        if (hasConnections) {
+          document.getElementById('modal-no-connections').classList.add('hidden');
+        }
+
+      } catch (error) {
+        console.error('Failed to load fork data:', error);
+        document.getElementById('modal-no-connections').textContent = 'Failed to load fork connections';
+      }
+
+      // Show modal
+      document.getElementById('fork-modal').classList.remove('hidden');
+    }
+
+    function closeForkModal() {
+      document.getElementById('fork-modal').classList.add('hidden');
+    }
+
+    // Close modal when clicking outside of it
+    document.getElementById('fork-modal')?.addEventListener('click', function(event) {
+      if (event.target.id === 'fork-modal') {
+        closeForkModal();
+      }
+    });
   </script>
 </body>
 </html>

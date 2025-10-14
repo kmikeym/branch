@@ -1174,6 +1174,84 @@ const server = Bun.serve({
       return new Response(file);
     }
 
+    if (url.pathname === "/api/repo-forks") {
+      // Get fork connections for a specific repository
+      const owner = url.searchParams.get("owner");
+      const repoName = url.searchParams.get("repo");
+
+      if (!owner || !repoName) {
+        return new Response(JSON.stringify({ error: "Missing owner or repo parameter" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      try {
+        // Get users who forked this repo (in our system)
+        const forkedByStmt = db.prepare(`
+          SELECT DISTINCT
+            f.forker_username,
+            u.avatar_url,
+            CASE
+              WHEN u.access_token IS NOT NULL THEN 'authenticated'
+              WHEN u.scanned_by IS NOT NULL THEN 'scanned'
+              ELSE 'unscanned'
+            END as user_type
+          FROM forks f
+          LEFT JOIN users u ON u.username = f.forker_username
+          WHERE f.repo_owner = ? AND f.repo_name = ?
+          ORDER BY f.forker_username ASC
+        `);
+
+        const forkedBy = forkedByStmt.all(owner, repoName) as any[];
+
+        // Check if this repo itself is a fork (look in repositories table)
+        const forkedFromStmt = db.prepare(`
+          SELECT DISTINCT
+            r.fork_parent_owner,
+            r.fork_parent_repo,
+            u.avatar_url as parent_avatar,
+            CASE
+              WHEN u.access_token IS NOT NULL THEN 'authenticated'
+              WHEN u.scanned_by IS NOT NULL THEN 'scanned'
+              ELSE 'unscanned'
+            END as parent_user_type
+          FROM repositories r
+          LEFT JOIN users u ON u.username = r.fork_parent_owner
+          WHERE r.user_id = (SELECT id FROM users WHERE username = ?)
+            AND r.name = ?
+            AND r.is_fork = 1
+            AND r.fork_parent_owner IS NOT NULL
+        `);
+
+        const forkedFrom = forkedFromStmt.get(owner, repoName) as any;
+
+        return new Response(JSON.stringify({
+          owner,
+          repo_name: repoName,
+          forked_by: forkedBy.map(f => ({
+            username: f.forker_username,
+            avatar_url: f.avatar_url,
+            user_type: f.user_type
+          })),
+          forked_from: forkedFrom ? {
+            owner: forkedFrom.fork_parent_owner,
+            repo: forkedFrom.fork_parent_repo,
+            avatar_url: forkedFrom.parent_avatar,
+            user_type: forkedFrom.parent_user_type
+          } : null
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Repo forks query error:", error);
+        return new Response(JSON.stringify({ error: "Failed to fetch fork data" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
     if (url.pathname === "/api/tech") {
       // Get all repos and users for a specific technology
       const tag = url.searchParams.get("tag");
