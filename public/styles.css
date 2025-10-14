@@ -276,6 +276,20 @@ body {
   transition: width 0.5s ease;
 }
 
+/* AI Assistance Styling */
+.ai-item {
+  background: #f0f7ff;
+  border-left: 4px solid #667eea;
+}
+
+.ai-item:hover {
+  background: #dbeafe;
+}
+
+.ai-bar-fill {
+  background: linear-gradient(90deg, #3b82f6 0%, #667eea 100%);
+}
+
 .empty-state {
   color: #999;
   font-style: italic;

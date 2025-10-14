@@ -49,6 +49,13 @@
               <!-- Populated by JS -->
             </div>
           </div>
+
+          <div class="section" id="ai-section">
+            <h3>🤖 AI Assistance Detected</h3>
+            <div id="ai-assistance" class="tech-list">
+              <!-- Populated by JS -->
+            </div>
+          </div>
         </div>
 
         <button id="rescan-btn" class="btn-secondary">Rescan Repositories</button>
@@ -154,6 +161,27 @@
             </div>
           </div>
         `).join('');
+      }
+
+      // Display AI assistance
+      const aiContainer = document.getElementById('ai-assistance');
+      const aiSection = document.getElementById('ai-section');
+
+      if (techData.ai_assistance && techData.ai_assistance.length > 0) {
+        aiSection.classList.remove('hidden');
+        aiContainer.innerHTML = techData.ai_assistance.map(ai => `
+          <div class="tech-item ai-item">
+            <div class="tech-info">
+              <span class="tech-name">${ai.tool}</span>
+              <span class="tech-count">${ai.repo_count} ${ai.repo_count === 1 ? 'repo' : 'repos'} • ${ai.mentions} ${ai.mentions === 1 ? 'mention' : 'mentions'}</span>
+            </div>
+            <div class="tech-bar">
+              <div class="tech-bar-fill ai-bar-fill" style="width: ${(ai.repo_count / scanData.repos_analyzed) * 100}%"></div>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        aiSection.classList.add('hidden');
       }
 
       // Setup rescan button

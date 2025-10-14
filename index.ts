@@ -30,6 +30,20 @@ db.run(`
   )
 `);
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS ai_assistance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    repo_name TEXT NOT NULL,
+    ai_tool TEXT NOT NULL,
+    mention_count INTEGER NOT NULL,
+    found_in TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(user_id, repo_name, ai_tool)
+  )
+`);
+
 console.log("✅ Database initialized");
 
 // Server configuration
@@ -164,8 +178,10 @@ const server = Bun.serve({
         );
 
         const repos = await reposResponse.json() as Array<{
+          name: string;
           language: string | null;
           topics: string[];
+          default_branch: string;
         }>;
 
         // Analyze tech stack
@@ -202,6 +218,56 @@ const server = Bun.serve({
 
         for (const [tech, data] of techCount.entries()) {
           insertStmt.run(user.id, tech, data.category, data.count);
+        }
+
+        // Scan for AI assistance mentions
+        const aiTools = {
+          "Claude Code": /claude[- ]code/gi,
+          "Claude": /\bclaude\b/gi,
+          "ChatGPT": /chatgpt|chat[- ]gpt/gi,
+          "GitHub Copilot": /copilot/gi,
+          "Cursor": /cursor ai|cursor\.ai/gi,
+          "AI Assisted": /ai[- ]assisted|ai[- ]generated|with ai|using ai/gi
+        };
+
+        // Clear old AI assistance data
+        db.run("DELETE FROM ai_assistance WHERE user_id = ?", [user.id]);
+
+        const aiInsertStmt = db.prepare(`
+          INSERT INTO ai_assistance (user_id, repo_name, ai_tool, mention_count, found_in)
+          VALUES (?, ?, ?, ?, ?)
+        `);
+
+        // Scan each repo's README
+        for (const repo of repos) {
+          try {
+            // Try to fetch README
+            const readmeResponse = await fetch(
+              `https://api.github.com/repos/${username}/${repo.name}/readme`,
+              {
+                headers: {
+                  "Authorization": `Bearer ${user.access_token}`,
+                  "Accept": "application/vnd.github.v3+json"
+                }
+              }
+            );
+
+            if (readmeResponse.ok) {
+              const readmeData = await readmeResponse.json() as { content: string; encoding: string };
+              const readmeContent = Buffer.from(readmeData.content, 'base64').toString('utf-8').toLowerCase();
+
+              // Check for each AI tool
+              for (const [toolName, pattern] of Object.entries(aiTools)) {
+                const matches = readmeContent.match(pattern);
+                if (matches && matches.length > 0) {
+                  aiInsertStmt.run(user.id, repo.name, toolName, matches.length, "README");
+                }
+              }
+            }
+          } catch (error) {
+            // Skip repos without README or with access issues
+            continue;
+          }
         }
 
         // Update last scan time
@@ -252,6 +318,17 @@ const server = Bun.serve({
         });
       }
 
+      // Get AI assistance data
+      const aiStmt = db.prepare(`
+        SELECT ai_tool, COUNT(DISTINCT repo_name) as repo_count, SUM(mention_count) as total_mentions
+        FROM ai_assistance
+        WHERE user_id = (SELECT id FROM users WHERE username = ?)
+        GROUP BY ai_tool
+        ORDER BY repo_count DESC, total_mentions DESC
+      `);
+
+      const aiResults = aiStmt.all(username) as any[];
+
       return new Response(JSON.stringify({
         username: results[0].username,
         avatar_url: results[0].avatar_url,
@@ -260,6 +337,11 @@ const server = Bun.serve({
           technology: r.technology,
           category: r.category,
           repo_count: r.repo_count
+        })),
+        ai_assistance: aiResults.map(r => ({
+          tool: r.ai_tool,
+          repo_count: r.repo_count,
+          mentions: r.total_mentions
         }))
       }), {
         headers: { "Content-Type": "application/json" }
@@ -270,4 +352,4 @@ const server = Bun.serve({
   }
 });
 
-console.log(`🚀 Branch server running at http://localhost:${PORT}`);
+console.log(`🚀 Branch server running on port ${PORT}`);
