@@ -377,24 +377,32 @@ const server = Bun.serve({
           });
         });
 
-        // Clear old tech stack and insert new
-        db.run("DELETE FROM tech_stack WHERE user_id = ?", [user.id]);
-
+        // Update tech stack (preserve historical data, just update counts)
         const insertStmt = db.prepare(`
           INSERT INTO tech_stack (user_id, technology, category, repo_count)
           VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id, technology) DO UPDATE SET
+            repo_count = excluded.repo_count,
+            updated_at = CURRENT_TIMESTAMP
         `);
 
         for (const [tech, data] of techCount.entries()) {
           insertStmt.run(user.id, tech, data.category, data.count);
         }
 
-        // Clear old repositories data
-        db.run("DELETE FROM repositories WHERE user_id = ?", [user.id]);
-
+        // Update repositories (preserve historical data, update existing)
         const repoInsertStmt = db.prepare(`
           INSERT INTO repositories (user_id, name, description, language, stars, url, is_fork, fork_parent_owner, fork_parent_repo)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(user_id, name) DO UPDATE SET
+            description = excluded.description,
+            language = excluded.language,
+            stars = excluded.stars,
+            url = excluded.url,
+            is_fork = excluded.is_fork,
+            fork_parent_owner = excluded.fork_parent_owner,
+            fork_parent_repo = excluded.fork_parent_repo,
+            updated_at = CURRENT_TIMESTAMP
         `);
 
         // Save all repos with fork information
@@ -412,12 +420,9 @@ const server = Bun.serve({
           );
         }
 
-        // Track fork relationships in forks table
-        // Clear old fork data for this user
-        db.run("DELETE FROM forks WHERE forker_username = ?", [username]);
-
+        // Track fork relationships in forks table (preserve historical data)
         const forkInsertStmt = db.prepare(`
-          INSERT INTO forks (repo_owner, repo_name, forker_username, forker_user_id)
+          INSERT OR IGNORE INTO forks (repo_owner, repo_name, forker_username, forker_user_id)
           VALUES (?, ?, ?, ?)
         `);
 
@@ -460,13 +465,13 @@ const server = Bun.serve({
           "Neon": /neon\.tech|\bneon\b/gi
         };
 
-        // Clear old AI assistance and services data
-        db.run("DELETE FROM ai_assistance WHERE user_id = ?", [user.id]);
-        db.run("DELETE FROM services WHERE user_id = ?", [user.id]);
-
+        // Update AI assistance data (preserve historical data)
         const aiInsertStmt = db.prepare(`
           INSERT INTO ai_assistance (user_id, repo_name, ai_tool, mention_count, found_in)
           VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(user_id, repo_name, ai_tool) DO UPDATE SET
+            mention_count = excluded.mention_count,
+            updated_at = CURRENT_TIMESTAMP
         `);
 
         const serviceCountMap = new Map<string, { repos: Set<string>; mentions: number }>();
@@ -521,24 +526,28 @@ const server = Bun.serve({
           }
         }
 
-        // Insert services data
+        // Update services data (preserve historical data)
         const servicesInsertStmt = db.prepare(`
           INSERT INTO services (user_id, service_name, repo_count, mention_count)
           VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id, service_name) DO UPDATE SET
+            repo_count = excluded.repo_count,
+            mention_count = excluded.mention_count,
+            updated_at = CURRENT_TIMESTAMP
         `);
 
         for (const [serviceName, data] of serviceCountMap.entries()) {
           servicesInsertStmt.run(user.id, serviceName, data.repos.size, data.mentions);
         }
 
-        // Fetch followers and following
+        // Fetch followers and following (preserve historical data)
         try {
-          // Clear old social connections
-          db.run("DELETE FROM social_connections WHERE user_id = ?", [user.id]);
-
           const socialInsertStmt = db.prepare(`
             INSERT INTO social_connections (user_id, github_username, avatar_url, connection_type)
             VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, github_username, connection_type) DO UPDATE SET
+              avatar_url = excluded.avatar_url,
+              updated_at = CURRENT_TIMESTAMP
           `);
 
           // Fetch followers (limit to 100) with authentication
@@ -823,11 +832,13 @@ const server = Bun.serve({
           }
         });
 
-        // Clear and rebuild tech stack
-        db.run("DELETE FROM tech_stack WHERE user_id = ?", [user.id]);
+        // Update tech stack (preserve historical data)
         const techInsertStmt = db.prepare(`
           INSERT INTO tech_stack (user_id, technology, category, repo_count)
           VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id, technology) DO UPDATE SET
+            repo_count = excluded.repo_count,
+            updated_at = CURRENT_TIMESTAMP
         `);
 
         for (const [tech, data] of techCount.entries()) {
