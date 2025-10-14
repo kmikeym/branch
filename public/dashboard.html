@@ -25,6 +25,7 @@
             <span>•</span>
             <span id="following-count">0 following</span>
           </div>
+          <p id="scanned-by-text" class="scanned-by-text hidden" style="margin-top: 8px; font-size: 0.9em; opacity: 0.85;"></p>
         </div>
       </div>
 
@@ -241,11 +242,27 @@
       const profileUsername = document.getElementById('profile-username');
       const followersCount = document.getElementById('followers-count');
       const followingCount = document.getElementById('following-count');
+      const scannedByText = document.getElementById('scanned-by-text');
 
       profileAvatar.src = techData.avatar_url;
       profileUsername.textContent = `@${techData.username}`;
       followersCount.textContent = `${techData.followers?.length || 0} followers`;
       followingCount.textContent = `${techData.following?.length || 0} following`;
+
+      // Apply user type class for CRT glow effect
+      profileAvatar.className = 'profile-avatar'; // Reset classes
+      if (techData.user_type) {
+        profileAvatar.classList.add(techData.user_type);
+      }
+
+      // Show who scanned them if applicable
+      if (techData.scanned_by) {
+        scannedByText.textContent = `Scanned by @${techData.scanned_by}`;
+        scannedByText.classList.remove('hidden');
+      } else {
+        scannedByText.classList.add('hidden');
+      }
+
       profileHeader.classList.remove('hidden');
 
       // Display location

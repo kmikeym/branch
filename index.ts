@@ -14,6 +14,7 @@ db.run(`
     access_token TEXT,
     location TEXT,
     github_location TEXT,
+    scanned_by TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     last_scan DATETIME
   )
@@ -253,12 +254,12 @@ const server = Bun.serve({
             location?: string;
           };
 
-          // Create user record without their own access token
+          // Create user record without their own access token, but track who scanned them
           const createStmt = db.prepare(`
-            INSERT INTO users (github_id, username, avatar_url, github_location, location)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO users (github_id, username, avatar_url, github_location, location, scanned_by)
+            VALUES (?, ?, ?, ?, ?, ?)
           `);
-          createStmt.run(userInfo.id, userInfo.login, userInfo.avatar_url, userInfo.location || null, userInfo.location || null);
+          createStmt.run(userInfo.id, userInfo.login, userInfo.avatar_url, userInfo.location || null, userInfo.location || null, scannerUsername || null);
 
           targetUser = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as any;
         }
@@ -524,7 +525,7 @@ const server = Bun.serve({
 
       // Get user info
       const userStmt = db.prepare(`
-        SELECT username, avatar_url, last_scan, location
+        SELECT username, avatar_url, last_scan, location, access_token, scanned_by
         FROM users
         WHERE username = ?
       `);
@@ -536,6 +537,14 @@ const server = Bun.serve({
           status: 404,
           headers: { "Content-Type": "application/json" }
         });
+      }
+
+      // Determine user type based on authentication status
+      let userType = 'unscanned';
+      if (userData.access_token) {
+        userType = 'authenticated'; // Green glow - user logged in themselves
+      } else if (userData.scanned_by) {
+        userType = 'scanned'; // Yellow glow - scanned by someone else
       }
 
       // Get tech stack
@@ -607,6 +616,8 @@ const server = Bun.serve({
         avatar_url: userData.avatar_url,
         location: userData.location,
         last_scan: userData.last_scan,
+        user_type: userType,
+        scanned_by: userData.scanned_by,
         followers: followersResults.map((f: any) => ({
           username: f.github_username,
           avatar_url: f.avatar_url
