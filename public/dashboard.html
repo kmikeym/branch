@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Branch</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <div class="dashboard">
+      <div class="header">
+        <h1>🌳 Branch</h1>
+        <div id="user-info" class="user-info">
+          <!-- Will be populated by JS -->
+        </div>
+      </div>
+
+      <div id="loading" class="loading">
+        <p>🔍 Scanning your repositories...</p>
+        <p class="loading-subtext">This may take a moment</p>
+      </div>
+
+      <div id="results" class="results hidden">
+        <div class="stats">
+          <div class="stat-card">
+            <span class="stat-number" id="repos-count">0</span>
+            <span class="stat-label">Repositories</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="tech-count">0</span>
+            <span class="stat-label">Technologies</span>
+          </div>
+        </div>
+
+        <div class="tech-stack">
+          <h2>Your Tech Stack</h2>
+
+          <div class="section">
+            <h3>Languages</h3>
+            <div id="languages" class="tech-list">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div class="section">
+            <h3>Frameworks & Tools</h3>
+            <div id="frameworks" class="tech-list">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <button id="rescan-btn" class="btn-secondary">Rescan Repositories</button>
+      </div>
+
+      <div id="error" class="error hidden">
+        <p>❌ Something went wrong</p>
+        <p id="error-message"></p>
+        <a href="/" class="btn-secondary">Go Back</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const username = urlParams.get('user');
+
+    if (!username) {
+      showError('No username provided');
+    } else {
+      initDashboard();
+    }
+
+    async function initDashboard() {
+      // Show user info
+      document.getElementById('user-info').innerHTML = `
+        <span>@${username}</span>
+        <a href="/" class="logout">Logout</a>
+      `;
+
+      // Start scan
+      await scanRepositories();
+    }
+
+    async function scanRepositories() {
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('results').classList.add('hidden');
+
+      try {
+        // Trigger scan
+        const scanResponse = await fetch(`/api/scan?username=${username}`);
+        const scanData = await scanResponse.json();
+
+        if (!scanResponse.ok) {
+          throw new Error(scanData.error || 'Scan failed');
+        }
+
+        // Fetch results
+        const techResponse = await fetch(`/api/techstack?username=${username}`);
+        const techData = await techResponse.json();
+
+        if (!techResponse.ok) {
+          throw new Error(techData.error || 'Failed to load tech stack');
+        }
+
+        displayResults(scanData, techData);
+
+      } catch (error) {
+        console.error(error);
+        showError(error.message);
+      }
+    }
+
+    function displayResults(scanData, techData) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('results').classList.remove('hidden');
+
+      // Update stats
+      document.getElementById('repos-count').textContent = scanData.repos_analyzed;
+      document.getElementById('tech-count').textContent = scanData.technologies_found;
+
+      // Separate languages and frameworks
+      const languages = techData.tech_stack.filter(t => t.category === 'language');
+      const frameworks = techData.tech_stack.filter(t => t.category === 'framework');
+
+      // Display languages
+      const languagesContainer = document.getElementById('languages');
+      languagesContainer.innerHTML = languages.map(tech => `
+        <div class="tech-item">
+          <div class="tech-info">
+            <span class="tech-name">${tech.technology}</span>
+            <span class="tech-count">${tech.repo_count} ${tech.repo_count === 1 ? 'repo' : 'repos'}</span>
+          </div>
+          <div class="tech-bar">
+            <div class="tech-bar-fill" style="width: ${(tech.repo_count / scanData.repos_analyzed) * 100}%"></div>
+          </div>
+        </div>
+      `).join('');
+
+      // Display frameworks
+      const frameworksContainer = document.getElementById('frameworks');
+      if (frameworks.length === 0) {
+        frameworksContainer.innerHTML = '<p class="empty-state">No framework tags found. Add topics to your repos!</p>';
+      } else {
+        frameworksContainer.innerHTML = frameworks.map(tech => `
+          <div class="tech-item">
+            <div class="tech-info">
+              <span class="tech-name">${tech.technology}</span>
+              <span class="tech-count">${tech.repo_count} ${tech.repo_count === 1 ? 'repo' : 'repos'}</span>
+            </div>
+            <div class="tech-bar">
+              <div class="tech-bar-fill" style="width: ${(tech.repo_count / scanData.repos_analyzed) * 100}%"></div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Setup rescan button
+      document.getElementById('rescan-btn').addEventListener('click', scanRepositories);
+    }
+
+    function showError(message) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('results').classList.add('hidden');
+      document.getElementById('error').classList.remove('hidden');
+      document.getElementById('error-message').textContent = message;
+    }
+  </script>
+</body>
+</html>
