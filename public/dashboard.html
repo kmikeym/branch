@@ -65,7 +65,10 @@
         </div>
 
         <div class="section">
-          <h3>📦 Repositories</h3>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 id="repositories-header">📦 Repositories</h3>
+            <button id="scan-more-btn" class="btn-secondary hidden" style="font-size: 0.9em;">Scan More Repos</button>
+          </div>
           <div id="repositories" class="repo-list">
             <!-- Populated by JS -->
           </div>
@@ -323,6 +326,24 @@
       // Update stats
       document.getElementById('repos-count').textContent = scanData.repos_analyzed;
       document.getElementById('tech-count').textContent = scanData.technologies_found;
+
+      // Update repositories header with count info
+      const reposHeader = document.getElementById('repositories-header');
+      const scanMoreBtn = document.getElementById('scan-more-btn');
+
+      if (techData.has_more_repos) {
+        reposHeader.textContent = `📦 Repositories (${techData.repos_scanned} of ${techData.total_repos})`;
+        scanMoreBtn.classList.remove('hidden');
+        scanMoreBtn.onclick = () => {
+          alert('Full repository scanning coming soon! For now, we scan your 20 most recently updated repos for faster performance.');
+        };
+      } else if (techData.total_repos > 0) {
+        reposHeader.textContent = `📦 Repositories (${techData.total_repos})`;
+        scanMoreBtn.classList.add('hidden');
+      } else {
+        reposHeader.textContent = '📦 Repositories';
+        scanMoreBtn.classList.add('hidden');
+      }
 
       // Display repositories
       const reposContainer = document.getElementById('repositories');
