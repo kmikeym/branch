@@ -12,6 +12,8 @@ db.run(`
     username TEXT NOT NULL,
     avatar_url TEXT,
     access_token TEXT,
+    location TEXT,
+    github_location TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     last_scan DATETIME
   )
@@ -41,6 +43,34 @@ db.run(`
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
     UNIQUE(user_id, repo_name, ai_tool)
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS repositories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    language TEXT,
+    stars INTEGER DEFAULT 0,
+    url TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(user_id, name)
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    service_name TEXT NOT NULL,
+    repo_count INTEGER NOT NULL,
+    mention_count INTEGER NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(user_id, service_name)
   )
 `);
 
@@ -121,18 +151,21 @@ const server = Bun.serve({
           id: number;
           login: string;
           avatar_url: string;
+          location?: string;
         };
 
         // Store or update user in database
         const stmt = db.prepare(`
-          INSERT INTO users (github_id, username, avatar_url, access_token)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO users (github_id, username, avatar_url, access_token, github_location, location)
+          VALUES (?, ?, ?, ?, ?, ?)
           ON CONFLICT(github_id) DO UPDATE SET
             access_token = excluded.access_token,
-            avatar_url = excluded.avatar_url
+            avatar_url = excluded.avatar_url,
+            github_location = excluded.github_location,
+            location = COALESCE(location, excluded.github_location)
         `);
 
-        stmt.run(userData.id, userData.login, userData.avatar_url, accessToken);
+        stmt.run(userData.id, userData.login, userData.avatar_url, accessToken, userData.location || null, userData.location || null);
 
         // Redirect to dashboard with user ID
         return Response.redirect(`/dashboard.html?user=${userData.login}`);
@@ -179,9 +212,12 @@ const server = Bun.serve({
 
         const repos = await reposResponse.json() as Array<{
           name: string;
+          description: string | null;
           language: string | null;
           topics: string[];
           default_branch: string;
+          stargazers_count: number;
+          html_url: string;
         }>;
 
         // Analyze tech stack
@@ -220,6 +256,26 @@ const server = Bun.serve({
           insertStmt.run(user.id, tech, data.category, data.count);
         }
 
+        // Clear old repositories data
+        db.run("DELETE FROM repositories WHERE user_id = ?", [user.id]);
+
+        const repoInsertStmt = db.prepare(`
+          INSERT INTO repositories (user_id, name, description, language, stars, url)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+
+        // Save all repos
+        for (const repo of repos) {
+          repoInsertStmt.run(
+            user.id,
+            repo.name,
+            repo.description || null,
+            repo.language || null,
+            repo.stargazers_count,
+            repo.html_url
+          );
+        }
+
         // Scan for AI assistance mentions
         const aiTools = {
           "Claude Code": /claude[- ]code/gi,
@@ -230,13 +286,34 @@ const server = Bun.serve({
           "AI Assisted": /ai[- ]assisted|ai[- ]generated|with ai|using ai/gi
         };
 
-        // Clear old AI assistance data
+        // Services to detect
+        const services = {
+          "Railway": /railway\.app|railway\.com|\brailway\b/gi,
+          "Cloudflare": /cloudflare|workers\.dev|pages\.dev/gi,
+          "Vercel": /vercel\.app|vercel\.com|\bvercel\b/gi,
+          "Netlify": /netlify\.app|netlify\.com|\bnetlify\b/gi,
+          "AWS": /amazonaws\.com|aws\.amazon|\baws\b/gi,
+          "Google Cloud": /cloud\.google|gcp|google cloud/gi,
+          "Heroku": /heroku\.com|heroku\.app|\bheroku\b/gi,
+          "DigitalOcean": /digitalocean\.com|\bdigitalocean\b/gi,
+          "Render": /render\.com|\brender\b/gi,
+          "Fly.io": /fly\.io|\bfly\.io\b/gi,
+          "Supabase": /supabase\.co|supabase\.com|\bsupabase\b/gi,
+          "Firebase": /firebase\.com|firebase\.google|\bfirebase\b/gi,
+          "PlanetScale": /planetscale\.com|\bplanetscale\b/gi,
+          "Neon": /neon\.tech|\bneon\b/gi
+        };
+
+        // Clear old AI assistance and services data
         db.run("DELETE FROM ai_assistance WHERE user_id = ?", [user.id]);
+        db.run("DELETE FROM services WHERE user_id = ?", [user.id]);
 
         const aiInsertStmt = db.prepare(`
           INSERT INTO ai_assistance (user_id, repo_name, ai_tool, mention_count, found_in)
           VALUES (?, ?, ?, ?, ?)
         `);
+
+        const serviceCountMap = new Map<string, { repos: Set<string>; mentions: number }>();
 
         // Scan each repo's README
         for (const repo of repos) {
@@ -254,13 +331,31 @@ const server = Bun.serve({
 
             if (readmeResponse.ok) {
               const readmeData = await readmeResponse.json() as { content: string; encoding: string };
-              const readmeContent = Buffer.from(readmeData.content, 'base64').toString('utf-8').toLowerCase();
+              const readmeContent = Buffer.from(readmeData.content, 'base64').toString('utf-8');
+              const readmeContentLower = readmeContent.toLowerCase();
 
               // Check for each AI tool
               for (const [toolName, pattern] of Object.entries(aiTools)) {
-                const matches = readmeContent.match(pattern);
+                const matches = readmeContentLower.match(pattern);
                 if (matches && matches.length > 0) {
                   aiInsertStmt.run(user.id, repo.name, toolName, matches.length, "README");
+                }
+              }
+
+              // Check for each service
+              for (const [serviceName, pattern] of Object.entries(services)) {
+                const matches = readmeContentLower.match(pattern);
+                if (matches && matches.length > 0) {
+                  const existing = serviceCountMap.get(serviceName);
+                  if (existing) {
+                    existing.repos.add(repo.name);
+                    existing.mentions += matches.length;
+                  } else {
+                    serviceCountMap.set(serviceName, {
+                      repos: new Set([repo.name]),
+                      mentions: matches.length
+                    });
+                  }
                 }
               }
             }
@@ -268,6 +363,16 @@ const server = Bun.serve({
             // Skip repos without README or with access issues
             continue;
           }
+        }
+
+        // Insert services data
+        const servicesInsertStmt = db.prepare(`
+          INSERT INTO services (user_id, service_name, repo_count, mention_count)
+          VALUES (?, ?, ?, ?)
+        `);
+
+        for (const [serviceName, data] of serviceCountMap.entries()) {
+          servicesInsertStmt.run(user.id, serviceName, data.repos.size, data.mentions);
         }
 
         // Update last scan time
@@ -301,22 +406,32 @@ const server = Bun.serve({
         });
       }
 
-      const stmt = db.prepare(`
-        SELECT t.technology, t.category, t.repo_count, u.username, u.avatar_url, u.last_scan
+      // Get user info
+      const userStmt = db.prepare(`
+        SELECT username, avatar_url, last_scan, location
+        FROM users
+        WHERE username = ?
+      `);
+
+      const userData = userStmt.get(username) as any;
+
+      if (!userData) {
+        return new Response(JSON.stringify({ error: "User not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      // Get tech stack
+      const techStmt = db.prepare(`
+        SELECT t.technology, t.category, t.repo_count
         FROM tech_stack t
         JOIN users u ON t.user_id = u.id
         WHERE u.username = ?
         ORDER BY t.repo_count DESC
       `);
 
-      const results = stmt.all(username) as any[];
-
-      if (results.length === 0) {
-        return new Response(JSON.stringify({ error: "No data found" }), {
-          status: 404,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
+      const techResults = techStmt.all(username) as any[];
 
       // Get AI assistance data
       const aiStmt = db.prepare(`
@@ -329,11 +444,39 @@ const server = Bun.serve({
 
       const aiResults = aiStmt.all(username) as any[];
 
+      // Get services data
+      const servicesStmt = db.prepare(`
+        SELECT service_name, repo_count, mention_count
+        FROM services
+        WHERE user_id = (SELECT id FROM users WHERE username = ?)
+        ORDER BY repo_count DESC, mention_count DESC
+      `);
+
+      const servicesResults = servicesStmt.all(username) as any[];
+
+      // Get repositories
+      const reposStmt = db.prepare(`
+        SELECT name, description, language, stars, url
+        FROM repositories
+        WHERE user_id = (SELECT id FROM users WHERE username = ?)
+        ORDER BY stars DESC, name ASC
+      `);
+
+      const reposResults = reposStmt.all(username) as any[];
+
       return new Response(JSON.stringify({
-        username: results[0].username,
-        avatar_url: results[0].avatar_url,
-        last_scan: results[0].last_scan,
-        tech_stack: results.map(r => ({
+        username: userData.username,
+        avatar_url: userData.avatar_url,
+        location: userData.location,
+        last_scan: userData.last_scan,
+        repositories: reposResults.map((r: any) => ({
+          name: r.name,
+          description: r.description,
+          language: r.language,
+          stars: r.stars,
+          url: r.url
+        })),
+        tech_stack: techResults.map(r => ({
           technology: r.technology,
           category: r.category,
           repo_count: r.repo_count
@@ -342,10 +485,47 @@ const server = Bun.serve({
           tool: r.ai_tool,
           repo_count: r.repo_count,
           mentions: r.total_mentions
+        })),
+        services: servicesResults.map(r => ({
+          service: r.service_name,
+          repo_count: r.repo_count,
+          mentions: r.mention_count
         }))
       }), {
         headers: { "Content-Type": "application/json" }
       });
+    }
+
+    if (url.pathname === "/api/update-location" && req.method === "POST") {
+      try {
+        const body = await req.json() as { username: string; location: string };
+        const { username, location } = body;
+
+        if (!username || location === undefined) {
+          return new Response(JSON.stringify({ error: "Missing username or location" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        const stmt = db.prepare(`
+          UPDATE users
+          SET location = ?
+          WHERE username = ?
+        `);
+
+        stmt.run(location, username);
+
+        return new Response(JSON.stringify({ success: true, location }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Update location error:", error);
+        return new Response(JSON.stringify({ error: "Failed to update location" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
     }
 
     return new Response("Not Found", { status: 404 });

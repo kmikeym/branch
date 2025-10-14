@@ -22,6 +22,18 @@
       </div>
 
       <div id="results" class="results hidden">
+        <div class="profile-section">
+          <div class="location-display">
+            <span id="location-text">📍 No location set</span>
+            <button id="edit-location-btn" class="edit-btn">Edit</button>
+          </div>
+          <div id="location-edit" class="location-edit hidden">
+            <input type="text" id="location-input" placeholder="Enter your location">
+            <button id="save-location-btn" class="btn-secondary">Save</button>
+            <button id="cancel-location-btn" class="btn-secondary">Cancel</button>
+          </div>
+        </div>
+
         <div class="stats">
           <div class="stat-card">
             <span class="stat-number" id="repos-count">0</span>
@@ -30,6 +42,13 @@
           <div class="stat-card">
             <span class="stat-number" id="tech-count">0</span>
             <span class="stat-label">Technologies</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>📦 Your Repositories</h3>
+          <div id="repositories" class="repo-list">
+            <!-- Populated by JS -->
           </div>
         </div>
 
@@ -53,6 +72,13 @@
           <div class="section" id="ai-section">
             <h3>🤖 AI Assistance Detected</h3>
             <div id="ai-assistance" class="tech-list">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div class="section" id="services-section">
+            <h3>☁️ Services & Platforms</h3>
+            <div id="services" class="tech-list">
               <!-- Populated by JS -->
             </div>
           </div>
@@ -123,9 +149,37 @@
       document.getElementById('loading').classList.add('hidden');
       document.getElementById('results').classList.remove('hidden');
 
+      // Display location
+      const locationText = document.getElementById('location-text');
+      if (techData.location) {
+        locationText.textContent = `📍 ${techData.location}`;
+      } else {
+        locationText.textContent = '📍 No location set';
+      }
+
+      // Setup location editing
+      setupLocationEditing(techData.location);
+
       // Update stats
       document.getElementById('repos-count').textContent = scanData.repos_analyzed;
       document.getElementById('tech-count').textContent = scanData.technologies_found;
+
+      // Display repositories
+      const reposContainer = document.getElementById('repositories');
+      if (techData.repositories && techData.repositories.length > 0) {
+        reposContainer.innerHTML = techData.repositories.map(repo => `
+          <div class="repo-item">
+            <div class="repo-header">
+              <a href="${repo.url}" target="_blank" class="repo-name">${repo.name}</a>
+              ${repo.stars > 0 ? `<span class="repo-stars">⭐ ${repo.stars}</span>` : ''}
+            </div>
+            ${repo.description ? `<p class="repo-description">${repo.description}</p>` : ''}
+            ${repo.language ? `<span class="repo-language">${repo.language}</span>` : ''}
+          </div>
+        `).join('');
+      } else {
+        reposContainer.innerHTML = '<p class="empty-state">No repositories found</p>';
+      }
 
       // Separate languages and frameworks
       const languages = techData.tech_stack.filter(t => t.category === 'language');
@@ -184,8 +238,73 @@
         aiSection.classList.add('hidden');
       }
 
+      // Display services
+      const servicesContainer = document.getElementById('services');
+      const servicesSection = document.getElementById('services-section');
+
+      if (techData.services && techData.services.length > 0) {
+        servicesSection.classList.remove('hidden');
+        servicesContainer.innerHTML = techData.services.map(service => `
+          <div class="tech-item service-item">
+            <div class="tech-info">
+              <span class="tech-name">${service.service}</span>
+              <span class="tech-count">${service.repo_count} ${service.repo_count === 1 ? 'repo' : 'repos'} • ${service.mentions} ${service.mentions === 1 ? 'mention' : 'mentions'}</span>
+            </div>
+            <div class="tech-bar">
+              <div class="tech-bar-fill service-bar-fill" style="width: ${(service.repo_count / scanData.repos_analyzed) * 100}%"></div>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        servicesSection.classList.add('hidden');
+      }
+
       // Setup rescan button
       document.getElementById('rescan-btn').addEventListener('click', scanRepositories);
+    }
+
+    function setupLocationEditing(currentLocation) {
+      const editBtn = document.getElementById('edit-location-btn');
+      const saveBtn = document.getElementById('save-location-btn');
+      const cancelBtn = document.getElementById('cancel-location-btn');
+      const locationDisplay = document.getElementById('location-text').parentElement;
+      const locationEdit = document.getElementById('location-edit');
+      const locationInput = document.getElementById('location-input');
+
+      locationInput.value = currentLocation || '';
+
+      editBtn.onclick = () => {
+        locationDisplay.classList.add('hidden');
+        locationEdit.classList.remove('hidden');
+      };
+
+      cancelBtn.onclick = () => {
+        locationEdit.classList.add('hidden');
+        locationDisplay.classList.remove('hidden');
+        locationInput.value = currentLocation || '';
+      };
+
+      saveBtn.onclick = async () => {
+        const newLocation = locationInput.value.trim();
+        try {
+          const response = await fetch('/api/update-location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, location: newLocation })
+          });
+
+          if (response.ok) {
+            document.getElementById('location-text').textContent = newLocation ? `📍 ${newLocation}` : '📍 No location set';
+            locationEdit.classList.add('hidden');
+            locationDisplay.classList.remove('hidden');
+          } else {
+            alert('Failed to update location');
+          }
+        } catch (error) {
+          console.error('Error updating location:', error);
+          alert('Failed to update location');
+        }
+      };
     }
 
     function showError(message) {
