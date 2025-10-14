@@ -9,7 +9,7 @@
 <body>
   <nav class="top-nav">
     <div class="nav-left">
-      <a href="/dashboard.html" class="logo-link">
+      <a href="/" class="logo-link">
         <span class="logo-icon">🌳</span>
         <span class="logo-text">Branch</span>
       </a>
@@ -85,16 +85,20 @@
 
           document.getElementById('nav-user-info').innerHTML = `
             <div class="nav-user-info">
-              <img src="${techData.avatar_url || `https://github.com/${loggedInUser}.png`}" alt="${loggedInUser}" class="nav-avatar">
-              <span class="nav-username">@${loggedInUser}</span>
+              <a href="/dashboard.html?user=${loggedInUser}" style="display: flex; align-items: center; gap: 12px; text-decoration: none;">
+                <img src="${techData.avatar_url || `https://github.com/${loggedInUser}.png`}" alt="${loggedInUser}" class="nav-avatar">
+                <span class="nav-username">@${loggedInUser}</span>
+              </a>
               <a href="/" class="nav-logout" onclick="localStorage.removeItem('loggedInUser')">Logout</a>
             </div>
           `;
         } catch (error) {
           document.getElementById('nav-user-info').innerHTML = `
             <div class="nav-user-info">
-              <img src="https://github.com/${loggedInUser}.png" alt="${loggedInUser}" class="nav-avatar">
-              <span class="nav-username">@${loggedInUser}</span>
+              <a href="/dashboard.html?user=${loggedInUser}" style="display: flex; align-items: center; gap: 12px; text-decoration: none;">
+                <img src="https://github.com/${loggedInUser}.png" alt="${loggedInUser}" class="nav-avatar">
+                <span class="nav-username">@${loggedInUser}</span>
+              </a>
               <a href="/" class="nav-logout" onclick="localStorage.removeItem('loggedInUser')">Logout</a>
             </div>
           `;
