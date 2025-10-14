@@ -152,16 +152,19 @@
         localStorage.setItem('loggedInUser', username);
       }
 
-      // Fetch user info to get avatar
+      // Get the logged-in user (not the profile being viewed)
+      const loggedInUser = localStorage.getItem('loggedInUser');
+
+      // Fetch logged-in user's info for navigation
       try {
-        const techResponse = await fetch(`/api/techstack?username=${username}`);
+        const techResponse = await fetch(`/api/techstack?username=${loggedInUser}`);
         const techData = await techResponse.json();
 
-        // Show user info in navigation
+        // Show LOGGED-IN user info in navigation (not the profile being viewed)
         document.getElementById('nav-user-info').innerHTML = `
           <div class="nav-user-info">
-            <img src="${techData.avatar_url || `https://github.com/${username}.png`}" alt="${username}" class="nav-avatar">
-            <span class="nav-username">@${username}</span>
+            <img src="${techData.avatar_url || `https://github.com/${loggedInUser}.png`}" alt="${loggedInUser}" class="nav-avatar">
+            <span class="nav-username">@${loggedInUser}</span>
             <a href="/" class="nav-logout" onclick="localStorage.removeItem('loggedInUser')">Logout</a>
           </div>
         `;
@@ -169,8 +172,8 @@
         // Fallback if we can't get avatar
         document.getElementById('nav-user-info').innerHTML = `
           <div class="nav-user-info">
-            <img src="https://github.com/${username}.png" alt="${username}" class="nav-avatar">
-            <span class="nav-username">@${username}</span>
+            <img src="https://github.com/${loggedInUser}.png" alt="${loggedInUser}" class="nav-avatar">
+            <span class="nav-username">@${loggedInUser}</span>
             <a href="/" class="nav-logout" onclick="localStorage.removeItem('loggedInUser')">Logout</a>
           </div>
         `;
