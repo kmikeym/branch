@@ -20,6 +20,14 @@ db.run(`
   )
 `);
 
+// Add scanned_by column to existing tables (migration)
+try {
+  db.run(`ALTER TABLE users ADD COLUMN scanned_by TEXT`);
+  console.log("✅ Added scanned_by column");
+} catch (e) {
+  // Column already exists, ignore error
+}
+
 db.run(`
   CREATE TABLE IF NOT EXISTS tech_stack (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
