@@ -608,6 +608,24 @@ body {
   font-size: 1em;
 }
 
+.location-cloud {
+  margin-top: 12px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+}
+
+.location-tag {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.location-tag:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 /* Repositories */
 .repo-list {
   display: flex;

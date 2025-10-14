@@ -1122,6 +1122,36 @@ const server = Bun.serve({
       }
     }
 
+    if (url.pathname === "/api/locations") {
+      // Get all unique locations with user counts
+      try {
+        const stmt = db.prepare(`
+          SELECT location, COUNT(*) as user_count
+          FROM users
+          WHERE location IS NOT NULL AND location != ''
+          GROUP BY location
+          ORDER BY user_count DESC, location ASC
+        `);
+
+        const locations = stmt.all() as any[];
+
+        return new Response(JSON.stringify({
+          locations: locations.map(l => ({
+            name: l.location,
+            user_count: l.user_count
+          }))
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Locations query error:", error);
+        return new Response(JSON.stringify({ error: "Failed to fetch locations" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
     if (url.pathname === "/api/location") {
       // Get all users in a specific location
       const location = url.searchParams.get("loc");

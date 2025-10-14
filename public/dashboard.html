@@ -51,12 +51,13 @@
         <div class="profile-section">
           <div class="location-display">
             <span id="location-text">📍 No location set</span>
-            <button id="edit-location-btn" class="edit-btn">Edit</button>
+            <button id="edit-location-btn" class="edit-btn hidden">Edit</button>
           </div>
-          <div id="location-edit" class="location-edit hidden">
-            <input type="text" id="location-input" placeholder="Enter your location">
-            <button id="save-location-btn" class="btn-secondary">Save</button>
-            <button id="cancel-location-btn" class="btn-secondary">Cancel</button>
+          <div id="location-cloud" class="location-cloud hidden">
+            <h4 style="margin-bottom: 12px; font-size: 0.95em; color: #666;">Choose a location:</h4>
+            <div id="location-tags" class="tech-tags">
+              <!-- Populated by JS -->
+            </div>
           </div>
         </div>
 
@@ -365,7 +366,7 @@
       const editLocationBtn = document.getElementById('edit-location-btn');
       if (isOwnProfile) {
         editLocationBtn.classList.remove('hidden');
-        setupLocationEditing(techData.location);
+        setupLocationTagCloud(techData.location);
       } else {
         editLocationBtn.classList.add('hidden');
       }
@@ -611,48 +612,65 @@
       document.getElementById('rescan-btn').addEventListener('click', scanRepositories);
     }
 
-    function setupLocationEditing(currentLocation) {
+    async function setupLocationTagCloud(currentLocation) {
       const editBtn = document.getElementById('edit-location-btn');
-      const saveBtn = document.getElementById('save-location-btn');
-      const cancelBtn = document.getElementById('cancel-location-btn');
       const locationDisplay = document.getElementById('location-text').parentElement;
-      const locationEdit = document.getElementById('location-edit');
-      const locationInput = document.getElementById('location-input');
+      const locationCloud = document.getElementById('location-cloud');
+      const locationTags = document.getElementById('location-tags');
 
-      locationInput.value = currentLocation || '';
-
-      editBtn.onclick = () => {
+      editBtn.onclick = async () => {
+        // Toggle visibility
         locationDisplay.classList.add('hidden');
-        locationEdit.classList.remove('hidden');
-      };
+        locationCloud.classList.remove('hidden');
 
-      cancelBtn.onclick = () => {
-        locationEdit.classList.add('hidden');
-        locationDisplay.classList.remove('hidden');
-        locationInput.value = currentLocation || '';
-      };
-
-      saveBtn.onclick = async () => {
-        const newLocation = locationInput.value.trim();
+        // Fetch all locations
         try {
-          const response = await fetch('/api/update-location', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, location: newLocation })
-          });
+          const response = await fetch('/api/locations');
+          const data = await response.json();
 
-          if (response.ok) {
-            document.getElementById('location-text').textContent = newLocation ? `📍 ${newLocation}` : '📍 No location set';
-            locationEdit.classList.add('hidden');
-            locationDisplay.classList.remove('hidden');
+          if (response.ok && data.locations && data.locations.length > 0) {
+            locationTags.innerHTML = data.locations.map(loc => `
+              <button class="tech-tag tech-tag-gray location-tag" onclick="setLocation('${loc.name.replace(/'/g, "\\'")}')">
+                ${loc.name} <span class="tech-tag-count">${loc.user_count}</span>
+              </button>
+            `).join('') + `
+              <button class="tech-tag tech-tag-gray location-tag" onclick="hideLocationCloud()" style="background: #fff; border: 1px dashed #ccc;">
+                Cancel
+              </button>
+            `;
           } else {
-            alert('Failed to update location');
+            locationTags.innerHTML = '<p class="empty-state">No locations yet. Be the first!</p>';
           }
         } catch (error) {
-          console.error('Error updating location:', error);
-          alert('Failed to update location');
+          console.error('Failed to load locations:', error);
+          locationTags.innerHTML = '<p class="empty-state">Failed to load locations</p>';
         }
       };
+    }
+
+    async function setLocation(newLocation) {
+      try {
+        const response = await fetch('/api/update-location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, location: newLocation })
+        });
+
+        if (response.ok) {
+          document.getElementById('location-text').innerHTML = `📍 <a href="/location.html?loc=${encodeURIComponent(newLocation)}" style="color: #1a1a1a; text-decoration: underline;">${newLocation}</a>`;
+          hideLocationCloud();
+        } else {
+          alert('Failed to update location');
+        }
+      } catch (error) {
+        console.error('Error updating location:', error);
+        alert('Failed to update location');
+      }
+    }
+
+    function hideLocationCloud() {
+      document.getElementById('location-cloud').classList.add('hidden');
+      document.getElementById('location-text').parentElement.classList.remove('hidden');
     }
 
     async function scanMoreRepos() {
