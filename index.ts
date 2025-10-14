@@ -31,6 +31,14 @@ try {
   // Column already exists, ignore error
 }
 
+// Add total_repos column (migration)
+try {
+  db.run(`ALTER TABLE users ADD COLUMN total_repos INTEGER DEFAULT 0`);
+  console.log("✅ Added total_repos column");
+} catch (e) {
+  // Column already exists, ignore error
+}
+
 db.run(`
   CREATE TABLE IF NOT EXISTS tech_stack (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -309,9 +317,19 @@ const server = Bun.serve({
 
         const user = targetUser;
 
-        // Fetch all repos with authentication
+        // First, get total repo count from user profile
+        const userInfoResponse = await fetch(`https://api.github.com/users/${username}`, {
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Accept": "application/vnd.github.v3+json"
+          }
+        });
+        const userInfo = await userInfoResponse.json() as { public_repos: number };
+        const totalRepoCount = userInfo.public_repos;
+
+        // Fetch repos sorted by stars (most popular first), limit to 20 for faster scanning
         const reposResponse = await fetch(
-          `https://api.github.com/users/${username}/repos?per_page=100`,
+          `https://api.github.com/users/${username}/repos?per_page=20&sort=updated&direction=desc`,
           {
             headers: {
               "Authorization": `Bearer ${accessToken}`,
@@ -563,12 +581,14 @@ const server = Bun.serve({
           // Continue even if social connections fail
         }
 
-        // Update last scan time
-        db.run("UPDATE users SET last_scan = CURRENT_TIMESTAMP WHERE id = ?", [user.id]);
+        // Update last scan time and total repos count
+        db.run("UPDATE users SET last_scan = CURRENT_TIMESTAMP, total_repos = ? WHERE id = ?", [totalRepoCount, user.id]);
 
         return new Response(JSON.stringify({
           success: true,
-          repos_analyzed: repos.length,
+          repos_scanned: repos.length,
+          total_repos: totalRepoCount,
+          has_more_repos: totalRepoCount > repos.length,
           technologies_found: techCount.size
         }), {
           headers: { "Content-Type": "application/json" }
@@ -596,7 +616,7 @@ const server = Bun.serve({
 
       // Get user info
       const userStmt = db.prepare(`
-        SELECT username, avatar_url, last_scan, location, access_token, scanned_by
+        SELECT username, avatar_url, last_scan, location, access_token, scanned_by, total_repos
         FROM users
         WHERE username = ?
       `);
@@ -743,6 +763,9 @@ const server = Bun.serve({
         last_scan: userData.last_scan,
         user_type: userType,
         scanned_by: userData.scanned_by,
+        total_repos: userData.total_repos || 0,
+        repos_scanned: reposResults.length,
+        has_more_repos: (userData.total_repos || 0) > reposResults.length,
         followers: followersResults.map((f: any) => ({
           username: f.github_username,
           avatar_url: f.avatar_url,
