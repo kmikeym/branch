@@ -201,8 +201,17 @@
     }
 
     async function scanRepositories() {
+      // Hide error and show loading with scanning status
+      document.getElementById('error').classList.add('hidden');
       document.getElementById('loading').classList.remove('hidden');
       document.getElementById('results').classList.add('hidden');
+
+      // Update loading text to show scanning status
+      const loadingDiv = document.getElementById('loading');
+      loadingDiv.innerHTML = `
+        <p>🔍 Scanning @${username}'s repositories...</p>
+        <p class="loading-subtext">This may take a moment</p>
+      `;
 
       try {
         // Get the logged-in user who is initiating the scan
@@ -233,6 +242,11 @@
 
       } catch (error) {
         console.error(error);
+        // Reset loading text back to default
+        loadingDiv.innerHTML = `
+          <p>🔍 Loading profile...</p>
+          <p class="loading-subtext">This may take a moment</p>
+        `;
         showError(error.message);
       }
     }
