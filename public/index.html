@@ -3,39 +3,114 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Branch - Your GitHub Tech Stack</title>
+  <title>Branch - Build more fast together</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="container">
-    <div class="hero">
-      <h1>🌳 Branch</h1>
-      <p class="tagline">Discover what technologies you actually use</p>
-
-      <div class="feature-list">
-        <div class="feature">
-          <span class="emoji">🔍</span>
-          <p>Scan all your GitHub repositories</p>
-        </div>
-        <div class="feature">
-          <span class="emoji">📊</span>
-          <p>Analyze your tech stack</p>
-        </div>
-        <div class="feature">
-          <span class="emoji">✨</span>
-          <p>See what you really work with</p>
-        </div>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <div class="logo-link" style="cursor: default;">
+        <span class="logo-icon">🌳</span>
+        <span class="logo-text">Branch</span>
       </div>
-
+    </div>
+    <div class="nav-right">
       <a href="/api/auth/github" class="btn-primary">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        Login
+      </a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="landing-hero">
+      <h1>Build more fast together</h1>
+      <p class="landing-tagline">Discover developers through their tech stack. Find who's building with the technologies you love.</p>
+
+      <a href="/api/auth/github" class="btn-primary btn-large">
         <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
         </svg>
-        Login with GitHub
+        Get Started with GitHub
       </a>
+    </div>
 
-      <p class="privacy-note">We only read your public repositories. No write access required.</p>
+    <div class="landing-stats">
+      <div class="stat-card">
+        <span class="stat-number" id="total-users">-</span>
+        <span class="stat-label">Developers</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number" id="total-repos">-</span>
+        <span class="stat-label">Repositories</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number" id="total-tech">-</span>
+        <span class="stat-label">Technologies</span>
+      </div>
+    </div>
+
+    <div class="landing-section">
+      <h2>Recently Active</h2>
+      <div id="recent-users" class="social-grid">
+        <div class="loading-placeholder">Loading...</div>
+      </div>
+    </div>
+
+    <div class="landing-section">
+      <h2>Popular Technologies</h2>
+      <div id="popular-tech" class="tech-tags">
+        <div class="loading-placeholder">Loading...</div>
+      </div>
     </div>
   </div>
+
+  <script>
+    // Load homepage stats
+    async function loadStats() {
+      try {
+        const response = await fetch('/api/stats');
+        const data = await response.json();
+
+        if (response.ok) {
+          document.getElementById('total-users').textContent = data.total_users;
+          document.getElementById('total-repos').textContent = data.total_repos;
+          document.getElementById('total-tech').textContent = data.total_technologies;
+
+          // Display recent users
+          const recentUsersContainer = document.getElementById('recent-users');
+          if (data.recent_users && data.recent_users.length > 0) {
+            recentUsersContainer.innerHTML = data.recent_users.map(user => `
+              <a href="/dashboard.html?user=${user.username}" class="social-card" title="${user.username}">
+                <img src="${user.avatar_url}" alt="${user.username}" class="${user.user_type || 'unscanned'}">
+                <span>${user.username}</span>
+              </a>
+            `).join('');
+          } else {
+            recentUsersContainer.innerHTML = '<p class="empty-state">No users yet. Be the first!</p>';
+          }
+
+          // Display popular technologies
+          const popularTechContainer = document.getElementById('popular-tech');
+          if (data.popular_tech && data.popular_tech.length > 0) {
+            popularTechContainer.innerHTML = data.popular_tech.map(tech => `
+              <a href="/tech.html?tag=${encodeURIComponent(tech.name)}" class="tech-tag tech-tag-${tech.color}">
+                ${tech.name} <span class="tech-tag-count">${tech.user_count}</span>
+              </a>
+            `).join('');
+          } else {
+            popularTechContainer.innerHTML = '<p class="empty-state">No technologies yet</p>';
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+      }
+    }
+
+    // Load stats on page load
+    loadStats();
+  </script>
 </body>
 </html>

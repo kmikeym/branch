@@ -867,6 +867,96 @@ const server = Bun.serve({
       return new Response(file);
     }
 
+    if (url.pathname === "/api/stats") {
+      // Get homepage statistics
+      try {
+        // Total users
+        const totalUsersStmt = db.prepare("SELECT COUNT(*) as count FROM users");
+        const totalUsers = (totalUsersStmt.get() as any).count;
+
+        // Total repositories
+        const totalReposStmt = db.prepare("SELECT COUNT(*) as count FROM repositories");
+        const totalRepos = (totalReposStmt.get() as any).count;
+
+        // Total unique technologies
+        const totalTechStmt = db.prepare(`
+          SELECT COUNT(DISTINCT technology) as count FROM (
+            SELECT technology FROM tech_stack
+            UNION
+            SELECT ai_tool as technology FROM ai_assistance
+            UNION
+            SELECT service_name as technology FROM services
+          )
+        `);
+        const totalTech = (totalTechStmt.get() as any).count;
+
+        // Recent users (authenticated or scanned, limit 12)
+        const recentUsersStmt = db.prepare(`
+          SELECT
+            username,
+            avatar_url,
+            CASE
+              WHEN access_token IS NOT NULL THEN 'authenticated'
+              WHEN scanned_by IS NOT NULL THEN 'scanned'
+              ELSE 'unscanned'
+            END as user_type,
+            COALESCE(last_scan, created_at) as activity_date
+          FROM users
+          WHERE access_token IS NOT NULL OR scanned_by IS NOT NULL
+          ORDER BY activity_date DESC
+          LIMIT 12
+        `);
+        const recentUsers = recentUsersStmt.all() as any[];
+
+        // Popular technologies (top 20)
+        const popularTechStmt = db.prepare(`
+          SELECT
+            tech as name,
+            user_count,
+            CASE
+              WHEN tech IN (SELECT ai_tool FROM ai_assistance) THEN 'blue'
+              WHEN tech IN (SELECT service_name FROM services) THEN 'green'
+              ELSE 'gray'
+            END as color
+          FROM (
+            SELECT technology as tech, COUNT(DISTINCT user_id) as user_count FROM tech_stack GROUP BY technology
+            UNION ALL
+            SELECT ai_tool as tech, COUNT(DISTINCT user_id) as user_count FROM ai_assistance GROUP BY ai_tool
+            UNION ALL
+            SELECT service_name as tech, COUNT(DISTINCT user_id) as user_count FROM services GROUP BY service_name
+          )
+          GROUP BY tech
+          ORDER BY user_count DESC
+          LIMIT 20
+        `);
+        const popularTech = popularTechStmt.all() as any[];
+
+        return new Response(JSON.stringify({
+          total_users: totalUsers,
+          total_repos: totalRepos,
+          total_technologies: totalTech,
+          recent_users: recentUsers.map(u => ({
+            username: u.username,
+            avatar_url: u.avatar_url,
+            user_type: u.user_type
+          })),
+          popular_tech: popularTech.map(t => ({
+            name: t.name,
+            user_count: t.user_count,
+            color: t.color
+          }))
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Stats query error:", error);
+        return new Response(JSON.stringify({ error: "Failed to fetch stats" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
     return new Response("Not Found", { status: 404 });
   }
 });
