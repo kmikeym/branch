@@ -50,20 +50,11 @@
       <div id="results" class="results hidden">
         <div class="profile-section">
           <div class="location-display">
-            <span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-              <span style="font-weight: 500;">📍 Locations:</span>
-              <span id="location-tags-display" style="display: flex; gap: 6px; flex-wrap: wrap;">
-                <!-- Populated by JS -->
-              </span>
-              <button id="add-location-btn" class="edit-btn hidden" style="font-size: 0.85em;">+ Add</button>
-            </span>
+            <span id="location-text">📍 No location set</span>
+            <button id="edit-location-btn" class="edit-btn hidden">Edit</button>
           </div>
           <div id="location-cloud" class="location-cloud hidden">
-            <h4 style="margin-bottom: 12px; font-size: 0.95em; color: #666;">Choose a location or add custom:</h4>
-            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-              <input type="text" id="custom-location-input" placeholder="Enter custom location" style="flex: 1; padding: 8px; border: 1px solid #e5e5e5; border-radius: 6px; font-size: 0.9em;">
-              <button id="add-custom-location-btn" class="btn-secondary" style="font-size: 0.9em;">Add</button>
-            </div>
+            <h4 style="margin-bottom: 12px; font-size: 0.95em; color: #666;">Choose a location:</h4>
             <div id="location-tags" class="tech-tags">
               <!-- Populated by JS -->
             </div>
@@ -359,30 +350,25 @@
 
       profileHeader.classList.remove('hidden');
 
-      // Display locations
-      const locationTagsDisplay = document.getElementById('location-tags-display');
+      // Display location
+      const locationText = document.getElementById('location-text');
       const loggedInUser = localStorage.getItem('loggedInUser');
       const isOwnProfile = username === loggedInUser;
 
-      if (techData.locations && techData.locations.length > 0) {
-        // Display multiple location tags
-        locationTagsDisplay.innerHTML = techData.locations.map(loc => `
-          <span style="display: inline-flex; align-items: center; gap: 4px; background: #f0f0f0; padding: 4px 10px; border-radius: 12px; font-size: 0.9em;">
-            <a href="/location.html?loc=${encodeURIComponent(loc)}" style="color: #1a1a1a; text-decoration: none;">${loc}</a>
-            ${isOwnProfile ? `<button onclick="removeLocation('${loc.replace(/'/g, "\\'")}'); event.stopPropagation();" style="background: none; border: none; cursor: pointer; color: #666; font-size: 1.1em; padding: 0; margin-left: 2px;" title="Remove">&times;</button>` : ''}
-          </span>
-        `).join('');
+      if (techData.location) {
+        // Make location clickable to view all users in that location
+        locationText.innerHTML = `📍 <a href="/location.html?loc=${encodeURIComponent(techData.location)}" style="color: #1a1a1a; text-decoration: underline;">${techData.location}</a>`;
       } else {
-        locationTagsDisplay.innerHTML = '<span style="color: #999; font-size: 0.9em;">None</span>';
+        locationText.textContent = '📍 No location set';
       }
 
-      // Only show add button for own profile
-      const addLocationBtn = document.getElementById('add-location-btn');
+      // Only show edit button for own profile
+      const editLocationBtn = document.getElementById('edit-location-btn');
       if (isOwnProfile) {
-        addLocationBtn.classList.remove('hidden');
-        setupLocationTagCloud(techData.locations || []);
+        editLocationBtn.classList.remove('hidden');
+        setupLocationTagCloud(techData.location);
       } else {
-        addLocationBtn.classList.add('hidden');
+        editLocationBtn.classList.add('hidden');
       }
 
       // Update stats
@@ -626,15 +612,13 @@
       document.getElementById('rescan-btn').addEventListener('click', scanRepositories);
     }
 
-    async function setupLocationTagCloud(currentLocations) {
-      const addBtn = document.getElementById('add-location-btn');
-      const locationDisplay = document.querySelector('.location-display');
+    async function setupLocationTagCloud(currentLocation) {
+      const editBtn = document.getElementById('edit-location-btn');
+      const locationDisplay = document.getElementById('location-text').parentElement;
       const locationCloud = document.getElementById('location-cloud');
       const locationTags = document.getElementById('location-tags');
-      const customInput = document.getElementById('custom-location-input');
-      const addCustomBtn = document.getElementById('add-custom-location-btn');
 
-      addBtn.onclick = async () => {
+      editBtn.onclick = async () => {
         // Toggle visibility
         locationDisplay.classList.add('hidden');
         locationCloud.classList.remove('hidden');
@@ -646,7 +630,7 @@
 
           if (response.ok && data.locations && data.locations.length > 0) {
             locationTags.innerHTML = data.locations.map(loc => `
-              <button class="tech-tag tech-tag-gray location-tag" onclick="addLocation('${loc.name.replace(/'/g, "\\'")}')">
+              <button class="tech-tag tech-tag-gray location-tag" onclick="setLocation('${loc.name.replace(/'/g, "\\'")}')">
                 ${loc.name} <span class="tech-tag-count">${loc.user_count}</span>
               </button>
             `).join('') + `
@@ -655,83 +639,38 @@
               </button>
             `;
           } else {
-            locationTags.innerHTML = `
-              <button class="tech-tag tech-tag-gray location-tag" onclick="hideLocationCloud()" style="background: #fff; border: 1px dashed #ccc;">
-                Cancel
-              </button>
-            `;
+            locationTags.innerHTML = '<p class="empty-state">No locations yet. Be the first!</p>';
           }
         } catch (error) {
           console.error('Failed to load locations:', error);
           locationTags.innerHTML = '<p class="empty-state">Failed to load locations</p>';
         }
       };
-
-      // Add custom location when button clicked
-      addCustomBtn.onclick = async () => {
-        const customLocation = customInput.value.trim();
-        if (customLocation) {
-          await addLocation(customLocation);
-          customInput.value = '';
-        }
-      };
-
-      // Add custom location when Enter key pressed
-      customInput.onkeypress = async (e) => {
-        if (e.key === 'Enter') {
-          const customLocation = customInput.value.trim();
-          if (customLocation) {
-            await addLocation(customLocation);
-            customInput.value = '';
-          }
-        }
-      };
     }
 
-    async function addLocation(newLocation) {
+    async function setLocation(newLocation) {
       try {
-        const response = await fetch('/api/add-location', {
+        const response = await fetch('/api/update-location', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, location: newLocation })
         });
 
         if (response.ok) {
-          // Reload the page to show updated locations
-          await loadExistingData();
+          document.getElementById('location-text').innerHTML = `📍 <a href="/location.html?loc=${encodeURIComponent(newLocation)}" style="color: #1a1a1a; text-decoration: underline;">${newLocation}</a>`;
           hideLocationCloud();
         } else {
-          alert('Failed to add location');
+          alert('Failed to update location');
         }
       } catch (error) {
-        console.error('Error adding location:', error);
-        alert('Failed to add location');
-      }
-    }
-
-    async function removeLocation(locationToRemove) {
-      try {
-        const response = await fetch('/api/remove-location', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, location: locationToRemove })
-        });
-
-        if (response.ok) {
-          // Reload the page to show updated locations
-          await loadExistingData();
-        } else {
-          alert('Failed to remove location');
-        }
-      } catch (error) {
-        console.error('Error removing location:', error);
-        alert('Failed to remove location');
+        console.error('Error updating location:', error);
+        alert('Failed to update location');
       }
     }
 
     function hideLocationCloud() {
       document.getElementById('location-cloud').classList.add('hidden');
-      document.querySelector('.location-display').classList.remove('hidden');
+      document.getElementById('location-text').parentElement.classList.remove('hidden');
     }
 
     async function scanMoreRepos() {
