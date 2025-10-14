@@ -501,6 +501,25 @@ body {
   text-align: center;
 }
 
+/* Rescan Section */
+.rescan-section {
+  margin-top: 40px;
+  padding: 20px;
+  background: #f6f8fa;
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.last-scan-text {
+  color: #666;
+  font-size: 1em;
+  margin: 0;
+}
+
 /* Utilities */
 .hidden {
   display: none !important;
