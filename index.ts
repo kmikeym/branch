@@ -134,6 +134,17 @@ db.run(`
   )
 `);
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS user_locations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    location TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(user_id, location)
+  )
+`);
+
 console.log("✅ Database initialized");
 
 // Server configuration
@@ -1031,10 +1042,21 @@ const server = Bun.serve({
 
       const forkedBy = forkedByStmt.all(username) as any[];
 
+      // Get user locations from user_locations table
+      const locationsStmt = db.prepare(`
+        SELECT location
+        FROM user_locations
+        WHERE user_id = (SELECT id FROM users WHERE username = ?)
+        ORDER BY created_at ASC
+      `);
+
+      const locationsResults = locationsStmt.all(username) as any[];
+
       return new Response(JSON.stringify({
         username: userData.username,
         avatar_url: userData.avatar_url,
         location: userData.location,
+        locations: locationsResults.map(l => l.location),
         last_scan: userData.last_scan,
         user_type: userType,
         scanned_by: userData.scanned_by,
@@ -1090,32 +1112,100 @@ const server = Bun.serve({
       });
     }
 
-    if (url.pathname === "/api/update-location" && req.method === "POST") {
+    if (url.pathname === "/api/add-location" && req.method === "POST") {
       try {
         const body = await req.json() as { username: string; location: string };
         const { username, location } = body;
 
-        if (!username || location === undefined) {
+        if (!username || !location) {
           return new Response(JSON.stringify({ error: "Missing username or location" }), {
             status: 400,
             headers: { "Content-Type": "application/json" }
           });
         }
 
+        // Get user ID
+        const userStmt = db.prepare("SELECT id FROM users WHERE username = ?");
+        const user = userStmt.get(username) as any;
+
+        if (!user) {
+          return new Response(JSON.stringify({ error: "User not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Add location (INSERT OR IGNORE to handle duplicates)
         const stmt = db.prepare(`
-          UPDATE users
-          SET location = ?
-          WHERE username = ?
+          INSERT OR IGNORE INTO user_locations (user_id, location)
+          VALUES (?, ?)
         `);
 
-        stmt.run(location, username);
+        stmt.run(user.id, location);
 
-        return new Response(JSON.stringify({ success: true, location }), {
+        // Get all locations for this user
+        const locationsStmt = db.prepare("SELECT location FROM user_locations WHERE user_id = ? ORDER BY created_at ASC");
+        const locations = locationsStmt.all(user.id) as any[];
+
+        return new Response(JSON.stringify({
+          success: true,
+          locations: locations.map(l => l.location)
+        }), {
           headers: { "Content-Type": "application/json" }
         });
       } catch (error) {
-        console.error("Update location error:", error);
-        return new Response(JSON.stringify({ error: "Failed to update location" }), {
+        console.error("Add location error:", error);
+        return new Response(JSON.stringify({ error: "Failed to add location" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/api/remove-location" && req.method === "POST") {
+      try {
+        const body = await req.json() as { username: string; location: string };
+        const { username, location } = body;
+
+        if (!username || !location) {
+          return new Response(JSON.stringify({ error: "Missing username or location" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Get user ID
+        const userStmt = db.prepare("SELECT id FROM users WHERE username = ?");
+        const user = userStmt.get(username) as any;
+
+        if (!user) {
+          return new Response(JSON.stringify({ error: "User not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Remove location
+        const stmt = db.prepare(`
+          DELETE FROM user_locations
+          WHERE user_id = ? AND location = ?
+        `);
+
+        stmt.run(user.id, location);
+
+        // Get remaining locations for this user
+        const locationsStmt = db.prepare("SELECT location FROM user_locations WHERE user_id = ? ORDER BY created_at ASC");
+        const locations = locationsStmt.all(user.id) as any[];
+
+        return new Response(JSON.stringify({
+          success: true,
+          locations: locations.map(l => l.location)
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Remove location error:", error);
+        return new Response(JSON.stringify({ error: "Failed to remove location" }), {
           status: 500,
           headers: { "Content-Type": "application/json" }
         });
@@ -1126,9 +1216,8 @@ const server = Bun.serve({
       // Get all unique locations with user counts
       try {
         const stmt = db.prepare(`
-          SELECT location, COUNT(*) as user_count
-          FROM users
-          WHERE location IS NOT NULL AND location != ''
+          SELECT location, COUNT(DISTINCT user_id) as user_count
+          FROM user_locations
           GROUP BY location
           ORDER BY user_count DESC, location ASC
         `);
@@ -1166,16 +1255,17 @@ const server = Bun.serve({
       try {
         const stmt = db.prepare(`
           SELECT
-            username,
-            avatar_url,
+            u.username,
+            u.avatar_url,
             CASE
-              WHEN access_token IS NOT NULL THEN 'authenticated'
-              WHEN scanned_by IS NOT NULL THEN 'scanned'
+              WHEN u.access_token IS NOT NULL THEN 'authenticated'
+              WHEN u.scanned_by IS NOT NULL THEN 'scanned'
               ELSE 'unscanned'
             END as user_type
-          FROM users
-          WHERE location = ?
-          ORDER BY username ASC
+          FROM users u
+          INNER JOIN user_locations ul ON u.id = ul.user_id
+          WHERE ul.location = ?
+          ORDER BY u.username ASC
         `);
 
         const users = stmt.all(location) as any[];
