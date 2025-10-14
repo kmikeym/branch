@@ -139,10 +139,16 @@
     }
 
     async function initDashboard() {
+      // Store the current user as the logged-in user if we don't have one yet
+      // This happens on first login via OAuth callback
+      if (!localStorage.getItem('loggedInUser')) {
+        localStorage.setItem('loggedInUser', username);
+      }
+
       // Show user info
       document.getElementById('user-info').innerHTML = `
         <span>@${username}</span>
-        <a href="/" class="logout">Logout</a>
+        <a href="/" class="logout" onclick="localStorage.removeItem('loggedInUser')">Logout</a>
       `;
 
       // Try to load existing data first
@@ -178,8 +184,16 @@
       document.getElementById('results').classList.add('hidden');
 
       try {
-        // Trigger scan
-        const scanResponse = await fetch(`/api/scan?username=${username}`);
+        // Get the logged-in user who is initiating the scan
+        const scanner = localStorage.getItem('loggedInUser');
+
+        // Trigger scan (pass scanner parameter if scanning someone else)
+        let scanUrl = `/api/scan?username=${username}`;
+        if (scanner && scanner !== username) {
+          scanUrl += `&scanner=${scanner}`;
+        }
+
+        const scanResponse = await fetch(scanUrl);
         const scanData = await scanResponse.json();
 
         if (!scanResponse.ok) {

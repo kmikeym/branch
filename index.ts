@@ -192,6 +192,7 @@ const server = Bun.serve({
     if (url.pathname === "/api/scan") {
       // Scan user's repositories
       const username = url.searchParams.get("username");
+      const scannerUsername = url.searchParams.get("scanner"); // Who is initiating the scan
 
       if (!username) {
         return new Response(JSON.stringify({ error: "Missing username" }), {
@@ -201,23 +202,75 @@ const server = Bun.serve({
       }
 
       try {
-        // Get user from database
-        const userStmt = db.prepare("SELECT * FROM users WHERE username = ?");
-        const user = userStmt.get(username) as any;
+        // Get scanner's token (the person who is logged in and wants to scan someone)
+        let accessToken = null;
+        if (scannerUsername) {
+          const scannerStmt = db.prepare("SELECT access_token FROM users WHERE username = ?");
+          const scanner = scannerStmt.get(scannerUsername) as any;
+          if (scanner) {
+            accessToken = scanner.access_token;
+          }
+        }
 
-        if (!user) {
-          return new Response(JSON.stringify({ error: "User not found" }), {
-            status: 404,
+        // If no scanner token, try to get the target user's token (for self-scan)
+        if (!accessToken) {
+          const userStmt = db.prepare("SELECT * FROM users WHERE username = ?");
+          const user = userStmt.get(username) as any;
+          if (user && user.access_token) {
+            accessToken = user.access_token;
+          }
+        }
+
+        if (!accessToken) {
+          return new Response(JSON.stringify({ error: "No authentication available. Please log in first." }), {
+            status: 401,
             headers: { "Content-Type": "application/json" }
           });
         }
+
+        // Check if target user exists, if not create a placeholder
+        let targetUser = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as any;
+        if (!targetUser) {
+          // Fetch basic user info from GitHub
+          const userInfoResponse = await fetch(`https://api.github.com/users/${username}`, {
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Accept": "application/vnd.github.v3+json"
+            }
+          });
+
+          if (!userInfoResponse.ok) {
+            return new Response(JSON.stringify({ error: "GitHub user not found" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          const userInfo = await userInfoResponse.json() as {
+            id: number;
+            login: string;
+            avatar_url: string;
+            location?: string;
+          };
+
+          // Create user record without their own access token
+          const createStmt = db.prepare(`
+            INSERT INTO users (github_id, username, avatar_url, github_location, location)
+            VALUES (?, ?, ?, ?, ?)
+          `);
+          createStmt.run(userInfo.id, userInfo.login, userInfo.avatar_url, userInfo.location || null, userInfo.location || null);
+
+          targetUser = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as any;
+        }
+
+        const user = targetUser;
 
         // Fetch all repos
         const reposResponse = await fetch(
           `https://api.github.com/users/${username}/repos?per_page=100`,
           {
             headers: {
-              "Authorization": `Bearer ${user.access_token}`,
+              "Authorization": `Bearer ${accessToken}`,
               "Accept": "application/vnd.github.v3+json"
             }
           }
@@ -336,7 +389,7 @@ const server = Bun.serve({
               `https://api.github.com/repos/${username}/${repo.name}/readme`,
               {
                 headers: {
-                  "Authorization": `Bearer ${user.access_token}`,
+                  "Authorization": `Bearer ${accessToken}`,
                   "Accept": "application/vnd.github.v3+json"
                 }
               }
@@ -403,7 +456,7 @@ const server = Bun.serve({
             `https://api.github.com/users/${username}/followers?per_page=100`,
             {
               headers: {
-                "Authorization": `Bearer ${user.access_token}`,
+                "Authorization": `Bearer ${accessToken}`,
                 "Accept": "application/vnd.github.v3+json"
               }
             }
@@ -421,7 +474,7 @@ const server = Bun.serve({
             `https://api.github.com/users/${username}/following?per_page=100`,
             {
               headers: {
-                "Authorization": `Bearer ${user.access_token}`,
+                "Authorization": `Bearer ${accessToken}`,
                 "Accept": "application/vnd.github.v3+json"
               }
             }
