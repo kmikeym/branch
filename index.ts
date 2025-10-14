@@ -40,6 +40,7 @@ const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || "";
 // Main server
 const server = Bun.serve({
   port: PORT,
+  hostname: "0.0.0.0", // Listen on all interfaces for Railway
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
 
