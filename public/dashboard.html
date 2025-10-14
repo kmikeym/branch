@@ -36,7 +36,7 @@
       </div>
 
       <div id="loading" class="loading">
-        <p>🔍 Scanning your repositories...</p>
+        <p>🔍 Loading profile...</p>
         <p class="loading-subtext">This may take a moment</p>
       </div>
 
@@ -65,14 +65,14 @@
         </div>
 
         <div class="section">
-          <h3>📦 Your Repositories</h3>
+          <h3>📦 Repositories</h3>
           <div id="repositories" class="repo-list">
             <!-- Populated by JS -->
           </div>
         </div>
 
         <div class="tech-stack">
-          <h2>Your Tech Stack</h2>
+          <h2>Tech Stack</h2>
 
           <div class="section">
             <h3>Languages</h3>
@@ -294,14 +294,24 @@
 
       // Display location
       const locationText = document.getElementById('location-text');
+      const loggedInUser = localStorage.getItem('loggedInUser');
+      const isOwnProfile = username === loggedInUser;
+
       if (techData.location) {
-        locationText.textContent = `📍 ${techData.location}`;
+        // Make location clickable to view all users in that location
+        locationText.innerHTML = `📍 <a href="/location.html?loc=${encodeURIComponent(techData.location)}" style="color: #1a1a1a; text-decoration: underline;">${techData.location}</a>`;
       } else {
         locationText.textContent = '📍 No location set';
       }
 
-      // Setup location editing
-      setupLocationEditing(techData.location);
+      // Only show edit button for own profile
+      const editLocationBtn = document.getElementById('edit-location-btn');
+      if (isOwnProfile) {
+        editLocationBtn.classList.remove('hidden');
+        setupLocationEditing(techData.location);
+      } else {
+        editLocationBtn.classList.add('hidden');
+      }
 
       // Update stats
       document.getElementById('repos-count').textContent = scanData.repos_analyzed;

@@ -718,6 +718,58 @@ const server = Bun.serve({
       }
     }
 
+    if (url.pathname === "/api/location") {
+      // Get all users in a specific location
+      const location = url.searchParams.get("loc");
+
+      if (!location) {
+        return new Response(JSON.stringify({ error: "Missing location parameter" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      try {
+        const stmt = db.prepare(`
+          SELECT
+            username,
+            avatar_url,
+            CASE
+              WHEN access_token IS NOT NULL THEN 'authenticated'
+              WHEN scanned_by IS NOT NULL THEN 'scanned'
+              ELSE 'unscanned'
+            END as user_type
+          FROM users
+          WHERE location = ?
+          ORDER BY username ASC
+        `);
+
+        const users = stmt.all(location) as any[];
+
+        return new Response(JSON.stringify({
+          location,
+          users: users.map(u => ({
+            username: u.username,
+            avatar_url: u.avatar_url,
+            user_type: u.user_type
+          }))
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Location query error:", error);
+        return new Response(JSON.stringify({ error: "Failed to fetch location data" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/location.html") {
+      const file = Bun.file("./public/location.html");
+      return new Response(file);
+    }
+
     return new Response("Not Found", { status: 404 });
   }
 });

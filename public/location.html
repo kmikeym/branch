@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Location - Branch</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/dashboard.html" class="logo-link">
+        <span class="logo-icon">🌳</span>
+        <span class="logo-text">Branch</span>
+      </a>
+    </div>
+    <div class="nav-right" id="nav-user-info">
+      <!-- Will be populated by JS -->
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="dashboard">
+      <div id="loading" class="loading">
+        <p>🌍 Loading location...</p>
+        <p class="loading-subtext">Finding users in this area</p>
+      </div>
+
+      <div id="results" class="results hidden">
+        <h1 id="location-title" style="font-size: 2em; margin-bottom: 32px; color: #1a1a1a;">📍 Location</h1>
+
+        <div class="stats">
+          <div class="stat-card">
+            <span class="stat-number" id="user-count">0</span>
+            <span class="stat-label">Users</span>
+          </div>
+        </div>
+
+        <div class="social-section">
+          <h2>People in this location</h2>
+          <div id="users" class="social-grid">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <div id="error" class="error hidden">
+        <p>❌ Something went wrong</p>
+        <p id="error-message"></p>
+        <a href="/dashboard.html" class="btn-secondary">Go Back</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const location = urlParams.get('loc');
+
+    if (!location) {
+      showError('No location provided');
+    } else {
+      initLocationPage();
+    }
+
+    async function initLocationPage() {
+      // Get the logged-in user for navigation
+      const loggedInUser = localStorage.getItem('loggedInUser');
+
+      if (loggedInUser) {
+        // Fetch logged-in user's info for navigation
+        try {
+          const techResponse = await fetch(`/api/techstack?username=${loggedInUser}`);
+          const techData = await techResponse.json();
+
+          document.getElementById('nav-user-info').innerHTML = `
+            <div class="nav-user-info">
+              <img src="${techData.avatar_url || `https://github.com/${loggedInUser}.png`}" alt="${loggedInUser}" class="nav-avatar">
+              <span class="nav-username">@${loggedInUser}</span>
+              <a href="/" class="nav-logout" onclick="localStorage.removeItem('loggedInUser')">Logout</a>
+            </div>
+          `;
+        } catch (error) {
+          document.getElementById('nav-user-info').innerHTML = `
+            <div class="nav-user-info">
+              <img src="https://github.com/${loggedInUser}.png" alt="${loggedInUser}" class="nav-avatar">
+              <span class="nav-username">@${loggedInUser}</span>
+              <a href="/" class="nav-logout" onclick="localStorage.removeItem('loggedInUser')">Logout</a>
+            </div>
+          `;
+        }
+      }
+
+      // Load users in this location
+      await loadLocationUsers();
+    }
+
+    async function loadLocationUsers() {
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('results').classList.add('hidden');
+
+      try {
+        const response = await fetch(`/api/location?loc=${encodeURIComponent(location)}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load location');
+        }
+
+        displayResults(data);
+
+      } catch (error) {
+        console.error(error);
+        showError(error.message);
+      }
+    }
+
+    function displayResults(data) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('results').classList.remove('hidden');
+
+      // Update title
+      document.getElementById('location-title').textContent = `📍 ${location}`;
+
+      // Update count
+      document.getElementById('user-count').textContent = data.users.length;
+
+      // Display users
+      const usersContainer = document.getElementById('users');
+      if (data.users && data.users.length > 0) {
+        usersContainer.innerHTML = data.users.map(user => `
+          <a href="/dashboard.html?user=${user.username}" class="social-card" title="${user.username}">
+            <img src="${user.avatar_url}" alt="${user.username}" class="${user.user_type || 'unscanned'}">
+            <span>${user.username}</span>
+          </a>
+        `).join('');
+      } else {
+        usersContainer.innerHTML = '<p class="empty-state">No users found in this location</p>';
+      }
+    }
+
+    function showError(message) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('results').classList.add('hidden');
+      document.getElementById('error').classList.remove('hidden');
+      document.getElementById('error-message').textContent = message;
+    }
+  </script>
+</body>
+</html>
