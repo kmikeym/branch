@@ -131,11 +131,28 @@ Railway has native Bun support and is the fastest way to deploy.
    - Go to https://github.com/settings/developers
    - Update your OAuth app callback URL to: `https://your-app.up.railway.app/api/auth/callback`
 
-5. **Add Persistent Storage:**
-   - In Railway, click "+ New" → "Volume"
-   - Mount path: `/app` (SQLite database will persist here)
+5. **⚠️ CRITICAL: Add Persistent Storage (DO THIS NOW!)**
 
-Done! Your app is live. 🎉
+   **Without this step, your database will be wiped on every deployment!**
+
+   - In Railway project view, click **"+ New"** button
+   - Select **"Volume"**
+   - Name it: `branch-database` (or any name you like)
+   - Size: 1 GB (free tier includes this)
+   - Click **"Add Volume"**
+   - After volume is created, click on it
+   - Set **Mount Path**: `/app`
+   - Click **"Save"**
+   - Your app will redeploy automatically
+
+   The SQLite database file `branch.db` now persists across deployments! 🎉
+
+   **To verify it's working:**
+   - Scan some repositories
+   - Push a new code change and let Railway redeploy
+   - Check if your scan data is still there (it should be!)
+
+Done! Your app is live with persistent data. 🎉
 
 ### Option 2: Fly.io 🪰
 
