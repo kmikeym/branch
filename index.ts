@@ -161,7 +161,8 @@ const server = Bun.serve({
     // API Routes
     if (url.pathname === "/api/auth/github") {
       // Redirect to GitHub OAuth
-      const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=read:user,repo`;
+      // Only request read access to public user profile - no repo access needed
+      const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=read:user`;
       return Response.redirect(githubAuthUrl);
     }
 
