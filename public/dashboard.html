@@ -383,7 +383,7 @@
         followersTotal.textContent = techData.followers.length;
         followersContainer.innerHTML = techData.followers.map(follower => `
           <a href="/dashboard.html?user=${follower.username}" class="social-card" title="${follower.username}">
-            <img src="${follower.avatar_url}" alt="${follower.username}">
+            <img src="${follower.avatar_url}" alt="${follower.username}" class="${follower.user_type || 'unscanned'}">
             <span>${follower.username}</span>
           </a>
         `).join('');
@@ -399,7 +399,7 @@
         followingTotal.textContent = techData.following.length;
         followingContainer.innerHTML = techData.following.map(person => `
           <a href="/dashboard.html?user=${person.username}" class="social-card" title="${person.username}">
-            <img src="${person.avatar_url}" alt="${person.username}">
+            <img src="${person.avatar_url}" alt="${person.username}" class="${person.user_type || 'unscanned'}">
             <span>${person.username}</span>
           </a>
         `).join('');

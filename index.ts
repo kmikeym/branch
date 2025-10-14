@@ -566,24 +566,40 @@ const server = Bun.serve({
 
       const reposResults = reposStmt.all(username) as any[];
 
-      // Get followers
+      // Get followers with their user type
       const followersStmt = db.prepare(`
-        SELECT github_username, avatar_url
-        FROM social_connections
-        WHERE user_id = (SELECT id FROM users WHERE username = ?)
-          AND connection_type = 'follower'
-        ORDER BY github_username ASC
+        SELECT
+          sc.github_username,
+          sc.avatar_url,
+          CASE
+            WHEN u.access_token IS NOT NULL THEN 'authenticated'
+            WHEN u.scanned_by IS NOT NULL THEN 'scanned'
+            ELSE 'unscanned'
+          END as user_type
+        FROM social_connections sc
+        LEFT JOIN users u ON u.username = sc.github_username
+        WHERE sc.user_id = (SELECT id FROM users WHERE username = ?)
+          AND sc.connection_type = 'follower'
+        ORDER BY sc.github_username ASC
       `);
 
       const followersResults = followersStmt.all(username) as any[];
 
-      // Get following
+      // Get following with their user type
       const followingStmt = db.prepare(`
-        SELECT github_username, avatar_url
-        FROM social_connections
-        WHERE user_id = (SELECT id FROM users WHERE username = ?)
-          AND connection_type = 'following'
-        ORDER BY github_username ASC
+        SELECT
+          sc.github_username,
+          sc.avatar_url,
+          CASE
+            WHEN u.access_token IS NOT NULL THEN 'authenticated'
+            WHEN u.scanned_by IS NOT NULL THEN 'scanned'
+            ELSE 'unscanned'
+          END as user_type
+        FROM social_connections sc
+        LEFT JOIN users u ON u.username = sc.github_username
+        WHERE sc.user_id = (SELECT id FROM users WHERE username = ?)
+          AND sc.connection_type = 'following'
+        ORDER BY sc.github_username ASC
       `);
 
       const followingResults = followingStmt.all(username) as any[];
@@ -597,11 +613,13 @@ const server = Bun.serve({
         scanned_by: userData.scanned_by,
         followers: followersResults.map((f: any) => ({
           username: f.github_username,
-          avatar_url: f.avatar_url
+          avatar_url: f.avatar_url,
+          user_type: f.user_type
         })),
         following: followingResults.map((f: any) => ({
           username: f.github_username,
-          avatar_url: f.avatar_url
+          avatar_url: f.avatar_url,
+          user_type: f.user_type
         })),
         repositories: reposResults.map((r: any) => ({
           name: r.name,

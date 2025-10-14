@@ -512,6 +512,31 @@ body {
   height: 60px;
   border-radius: 50%;
   border: 2px solid #667eea;
+  transition: all 0.3s ease;
+}
+
+/* CRT Glow Effects for Social Grid Avatars */
+.social-card img.authenticated {
+  box-shadow:
+    0 0 15px rgba(0, 255, 100, 0.7),
+    0 0 30px rgba(0, 255, 100, 0.5),
+    0 0 45px rgba(0, 255, 100, 0.3);
+  border-color: rgba(0, 255, 100, 0.9);
+}
+
+.social-card img.scanned {
+  box-shadow:
+    0 0 15px rgba(255, 200, 0, 0.7),
+    0 0 30px rgba(255, 200, 0, 0.5),
+    0 0 45px rgba(255, 200, 0, 0.3);
+  border-color: rgba(255, 200, 0, 0.9);
+}
+
+.social-card img.unscanned {
+  box-shadow:
+    0 0 8px rgba(128, 128, 128, 0.3),
+    0 0 15px rgba(128, 128, 128, 0.2);
+  border-color: rgba(128, 128, 128, 0.5);
 }
 
 .social-card span {
