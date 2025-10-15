@@ -1051,3 +1051,59 @@ body {
     padding: 20px;
   }
 }
+
+/* Tag Styles */
+.tag-user {
+  border-radius: 16px !important; /* Rounded corners for user tags */
+  position: relative;
+}
+
+.tag-system {
+  border-radius: 6px !important; /* Squared corners for system (tech) tags */
+}
+
+.tag-green {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  border-color: #86efac !important;
+}
+
+.tag-green:hover {
+  background: #bbf7d0 !important;
+  border-color: #4ade80 !important;
+}
+
+.tag-grey {
+  background: #f5f5f5 !important;
+  color: #666 !important;
+  border-color: #e0e0e0 !important;
+}
+
+.tag-grey:hover {
+  background: #ebebeb !important;
+  border-color: #999 !important;
+}
+
+.tag-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.2em;
+  cursor: pointer;
+  padding: 0 0 0 4px;
+  margin-left: 4px;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+  line-height: 1;
+}
+
+.tag-remove:hover {
+  opacity: 1;
+}
+
+.tags-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}

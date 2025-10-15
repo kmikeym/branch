@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tag - Branch</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="logo-link">
+        <span class="logo-icon">🌳</span>
+        <span class="logo-text">Branch</span>
+      </a>
+    </div>
+    <div class="nav-right" id="nav-user-info">
+      <!-- Will be populated by JS -->
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="dashboard">
+      <div id="loading" class="loading">
+        <p>🔍 Loading tag data...</p>
+        <p class="loading-subtext">Finding users and repos</p>
+      </div>
+
+      <div id="results" class="results hidden">
+        <h1 id="tag-title" style="font-size: 2em; margin-bottom: 32px; color: #1a1a1a;"></h1>
+
+        <div class="stats">
+          <div class="stat-card">
+            <span class="stat-number" id="user-count">0</span>
+            <span class="stat-label">Users</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-number" id="repo-count">0</span>
+            <span class="stat-label">Repositories</span>
+          </div>
+        </div>
+
+        <div class="social-section">
+          <h2>Users with this tag</h2>
+          <div id="users" class="social-grid">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <div class="section" id="repos-section">
+          <h2>Repositories</h2>
+          <div id="repositories" class="repo-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <div id="error" class="error hidden">
+        <p>❌ Something went wrong</p>
+        <p id="error-message"></p>
+        <a href="/dashboard.html" class="btn-secondary">Go Back</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const tagName = urlParams.get('name');
+
+    if (!tagName) {
+      showError('No tag specified');
+    } else {
+      initTagPage();
+    }
+
+    async function initTagPage() {
+      // Get the logged-in user for navigation
+      const loggedInUser = localStorage.getItem('loggedInUser');
+
+      if (loggedInUser) {
+        // Fetch logged-in user's info for navigation
+        try {
+          const techResponse = await fetch(`/api/techstack?username=${loggedInUser}`);
+          const techData = await techResponse.json();
+
+          document.getElementById('nav-user-info').innerHTML = `
+            <div class="nav-user-info">
+              <a href="/dashboard.html?user=${loggedInUser}" style="display: flex; align-items: center; gap: 12px; text-decoration: none;">
+                <img src="${techData.avatar_url || `https://github.com/${loggedInUser}.png`}" alt="${loggedInUser}" class="nav-avatar">
+                <span class="nav-username">@${loggedInUser}</span>
+              </a>
+              <a href="/" class="nav-logout" onclick="localStorage.removeItem('loggedInUser')">Logout</a>
+            </div>
+          `;
+        } catch (error) {
+          document.getElementById('nav-user-info').innerHTML = `
+            <div class="nav-user-info">
+              <a href="/dashboard.html?user=${loggedInUser}" style="display: flex; align-items: center; gap: 12px; text-decoration: none;">
+                <img src="https://github.com/${loggedInUser}.png" alt="${loggedInUser}" class="nav-avatar">
+                <span class="nav-username">@${loggedInUser}</span>
+              </a>
+              <a href="/" class="nav-logout" onclick="localStorage.removeItem('loggedInUser')">Logout</a>
+            </div>
+          `;
+        }
+      }
+
+      // Load tag data
+      await loadTagData();
+    }
+
+    async function loadTagData() {
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('results').classList.add('hidden');
+
+      try {
+        const response = await fetch(`/api/tag?name=${encodeURIComponent(tagName)}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load tag data');
+        }
+
+        displayResults(data);
+
+      } catch (error) {
+        console.error(error);
+        showError(error.message);
+      }
+    }
+
+    function displayResults(data) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('results').classList.remove('hidden');
+
+      // Update title
+      document.getElementById('tag-title').textContent = `🏷️ ${tagName}`;
+
+      // Update counts
+      document.getElementById('user-count').textContent = data.users.length;
+      document.getElementById('repo-count').textContent = data.repositories.length;
+
+      // Display users
+      const usersContainer = document.getElementById('users');
+      if (data.users && data.users.length > 0) {
+        usersContainer.innerHTML = data.users.map(user => `
+          <a href="/dashboard.html?user=${user.username}" class="social-card" title="${user.username}">
+            <img src="${user.avatar_url}" alt="${user.username}" class="${user.user_type || 'unscanned'}">
+            <span>${user.username}</span>
+            ${user.tag_count > 1 ? `<span style="font-size: 0.8em; color: #666;">${user.tag_count} tags</span>` : ''}
+          </a>
+        `).join('');
+      } else {
+        usersContainer.innerHTML = '<p class="empty-state">No users found with this tag</p>';
+      }
+
+      // Display repositories
+      const reposContainer = document.getElementById('repositories');
+      const reposSection = document.getElementById('repos-section');
+
+      if (data.repositories && data.repositories.length > 0) {
+        reposSection.classList.remove('hidden');
+        reposContainer.innerHTML = data.repositories.map(repo => `
+          <div class="repo-item">
+            <div class="repo-header">
+              <a href="${repo.url}" target="_blank" class="repo-name">${repo.name}</a>
+              <a href="/dashboard.html?user=${repo.username}" style="color: #666; text-decoration: none; font-size: 0.9em;">@${repo.username}</a>
+            </div>
+            ${repo.description ? `<p class="repo-description">${repo.description}</p>` : ''}
+            ${repo.stars > 0 ? `<span class="repo-stars" style="font-size: 0.9em; color: #666;">⭐ ${repo.stars}</span>` : ''}
+          </div>
+        `).join('');
+      } else {
+        reposSection.classList.add('hidden');
+      }
+    }
+
+    function showError(message) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('results').classList.add('hidden');
+      document.getElementById('error').classList.remove('hidden');
+      document.getElementById('error-message').textContent = message;
+    }
+  </script>
+</body>
+</html>

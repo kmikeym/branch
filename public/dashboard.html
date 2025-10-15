@@ -49,15 +49,11 @@
 
       <div id="results" class="results hidden">
         <div class="profile-section">
-          <div class="location-display">
-            <span id="location-text">📍 No location set</span>
-            <button id="edit-location-btn" class="edit-btn hidden">Edit</button>
-          </div>
-          <div id="location-cloud" class="location-cloud hidden">
-            <h4 style="margin-bottom: 12px; font-size: 0.95em; color: #666;">Choose a location:</h4>
-            <div id="location-tags" class="tech-tags">
+          <div class="tags-display">
+            <div id="tags-container" class="tech-tags">
               <!-- Populated by JS -->
             </div>
+            <button id="add-tag-btn" class="edit-btn hidden">+ Add Tag</button>
           </div>
         </div>
 
@@ -167,6 +163,25 @@
 
         <div style="margin-top: 24px;">
           <a id="modal-github-link" href="#" target="_blank" class="btn-secondary">View on GitHub</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tags Modal -->
+  <div id="tags-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Add Tags</h2>
+        <button class="modal-close" onclick="closeTagsModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 20px;">
+          <input type="text" id="new-tag-input" placeholder="Enter a tag..." style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ddd; border-radius: 6px;">
+          <button id="add-new-tag-btn" class="btn-primary" style="margin-top: 10px; width: 100%;">Add Tag</button>
+        </div>
+        <div id="all-tags-list" class="tech-tags" style="max-height: 300px; overflow-y: auto;">
+          <!-- Populated by JS -->
         </div>
       </div>
     </div>
@@ -350,25 +365,18 @@
 
       profileHeader.classList.remove('hidden');
 
-      // Display location
-      const locationText = document.getElementById('location-text');
+      // Display tags
       const loggedInUser = localStorage.getItem('loggedInUser');
       const isOwnProfile = username === loggedInUser;
+      await displayTags(username, loggedInUser);
 
-      if (techData.location) {
-        // Make location clickable to view all users in that location
-        locationText.innerHTML = `📍 <a href="/location.html?loc=${encodeURIComponent(techData.location)}" style="color: #1a1a1a; text-decoration: underline;">${techData.location}</a>`;
+      // Only show add tag button if logged in
+      const addTagBtn = document.getElementById('add-tag-btn');
+      if (loggedInUser) {
+        addTagBtn.classList.remove('hidden');
+        setupTagsModal(username, loggedInUser);
       } else {
-        locationText.textContent = '📍 No location set';
-      }
-
-      // Only show edit button for own profile
-      const editLocationBtn = document.getElementById('edit-location-btn');
-      if (isOwnProfile) {
-        editLocationBtn.classList.remove('hidden');
-        setupLocationTagCloud(techData.location);
-      } else {
-        editLocationBtn.classList.add('hidden');
+        addTagBtn.classList.add('hidden');
       }
 
       // Update stats
@@ -612,65 +620,113 @@
       document.getElementById('rescan-btn').addEventListener('click', scanRepositories);
     }
 
-    async function setupLocationTagCloud(currentLocation) {
-      const editBtn = document.getElementById('edit-location-btn');
-      const locationDisplay = document.getElementById('location-text').parentElement;
-      const locationCloud = document.getElementById('location-cloud');
-      const locationTags = document.getElementById('location-tags');
+    async function displayTags(username, viewerUsername) {
+      try {
+        const response = await fetch(`/api/tags?username=${username}&viewer=${viewerUsername || ''}`);
+        const data = await response.json();
 
-      editBtn.onclick = async () => {
-        // Toggle visibility
-        locationDisplay.classList.add('hidden');
-        locationCloud.classList.remove('hidden');
+        const tagsContainer = document.getElementById('tags-container');
 
-        // Fetch all locations
-        try {
-          const response = await fetch('/api/locations');
-          const data = await response.json();
+        if (data.tags && data.tags.length > 0) {
+          tagsContainer.innerHTML = data.tags.map(tagData => {
+            const isOwnTag = tagData.is_own_tag;
+            const colorClass = isOwnTag ? 'tag-green' : 'tag-grey';
+            const canRemove = tagData.tagged_by.some(t => t.is_viewer);
 
-          if (response.ok && data.locations && data.locations.length > 0) {
-            locationTags.innerHTML = data.locations.map(loc => `
-              <button class="tech-tag tech-tag-gray location-tag" onclick="setLocation('${loc.name.replace(/'/g, "\\'")}')">
-                ${loc.name} <span class="tech-tag-count">${loc.user_count}</span>
-              </button>
-            `).join('') + `
-              <button class="tech-tag tech-tag-gray location-tag" onclick="hideLocationCloud()" style="background: #fff; border: 1px dashed #ccc;">
-                Cancel
-              </button>
+            return `
+              <span class="tech-tag tag-user ${colorClass}">
+                <a href="/tag.html?name=${encodeURIComponent(tagData.tag)}" style="color: inherit; text-decoration: none;">
+                  ${tagData.tag}
+                </a>
+                ${canRemove ? `<button class="tag-remove" onclick="removeTag('${tagData.tag.replace(/'/g, "\\'")}')">×</button>` : ''}
+              </span>
             `;
+          }).join('');
+        } else {
+          tagsContainer.innerHTML = '<p class="empty-state" style="margin: 8px 0; color: #999;">No tags yet</p>';
+        }
+      } catch (error) {
+        console.error('Failed to load tags:', error);
+      }
+    }
+
+    function setupTagsModal(username, loggedInUser) {
+      const addTagBtn = document.getElementById('add-tag-btn');
+      const tagsModal = document.getElementById('tags-modal');
+      const addNewTagBtn = document.getElementById('add-new-tag-btn');
+      const newTagInput = document.getElementById('new-tag-input');
+
+      addTagBtn.onclick = () => {
+        tagsModal.classList.remove('hidden');
+      };
+
+      addNewTagBtn.onclick = async () => {
+        const tag = newTagInput.value.trim();
+        if (!tag) return;
+
+        try {
+          const response = await fetch('/api/add-tag', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tagged_username: username,
+              tag: tag,
+              tagged_by_username: loggedInUser
+            })
+          });
+
+          if (response.ok) {
+            newTagInput.value = '';
+            await displayTags(username, loggedInUser);
+            closeTagsModal();
           } else {
-            locationTags.innerHTML = '<p class="empty-state">No locations yet. Be the first!</p>';
+            const data = await response.json();
+            alert(data.error || 'Failed to add tag');
           }
         } catch (error) {
-          console.error('Failed to load locations:', error);
-          locationTags.innerHTML = '<p class="empty-state">Failed to load locations</p>';
+          console.error('Error adding tag:', error);
+          alert('Failed to add tag');
+        }
+      };
+
+      // Add tag on Enter key
+      newTagInput.onkeypress = (e) => {
+        if (e.key === 'Enter') {
+          addNewTagBtn.click();
         }
       };
     }
 
-    async function setLocation(newLocation) {
+    async function removeTag(tag) {
+      const loggedInUser = localStorage.getItem('loggedInUser');
+
+      if (!confirm(`Remove tag "${tag}"?`)) return;
+
       try {
-        const response = await fetch('/api/update-location', {
+        const response = await fetch('/api/remove-tag', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, location: newLocation })
+          body: JSON.stringify({
+            tagged_username: username,
+            tag: tag,
+            logged_in_username: loggedInUser
+          })
         });
 
         if (response.ok) {
-          document.getElementById('location-text').innerHTML = `📍 <a href="/location.html?loc=${encodeURIComponent(newLocation)}" style="color: #1a1a1a; text-decoration: underline;">${newLocation}</a>`;
-          hideLocationCloud();
+          await displayTags(username, loggedInUser);
         } else {
-          alert('Failed to update location');
+          const data = await response.json();
+          alert(data.error || 'Failed to remove tag');
         }
       } catch (error) {
-        console.error('Error updating location:', error);
-        alert('Failed to update location');
+        console.error('Error removing tag:', error);
+        alert('Failed to remove tag');
       }
     }
 
-    function hideLocationCloud() {
-      document.getElementById('location-cloud').classList.add('hidden');
-      document.getElementById('location-text').parentElement.classList.remove('hidden');
+    function closeTagsModal() {
+      document.getElementById('tags-modal').classList.add('hidden');
     }
 
     async function scanMoreRepos() {
@@ -790,10 +846,16 @@
       document.getElementById('fork-modal').classList.add('hidden');
     }
 
-    // Close modal when clicking outside of it
+    // Close modals when clicking outside of them
     document.getElementById('fork-modal')?.addEventListener('click', function(event) {
       if (event.target.id === 'fork-modal') {
         closeForkModal();
+      }
+    });
+
+    document.getElementById('tags-modal')?.addEventListener('click', function(event) {
+      if (event.target.id === 'tags-modal') {
+        closeTagsModal();
       }
     });
   </script>

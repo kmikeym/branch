@@ -134,6 +134,19 @@ db.run(`
   )
 `);
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tagged_by_user_id INTEGER NOT NULL,
+    tagged_entity_type TEXT NOT NULL,
+    tagged_entity_id INTEGER NOT NULL,
+    tag TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tagged_by_user_id) REFERENCES users(id),
+    UNIQUE(tagged_by_user_id, tagged_entity_type, tagged_entity_id, tag)
+  )
+`);
+
 console.log("✅ Database initialized");
 
 // Server configuration
@@ -1199,6 +1212,255 @@ const server = Bun.serve({
       }
     }
 
+    if (url.pathname === "/api/tags") {
+      // Get all tags for a user (with tagged_by info to show green vs grey)
+      const username = url.searchParams.get("username");
+      const viewerUsername = url.searchParams.get("viewer"); // Who's viewing (for relative coloring)
+
+      if (!username) {
+        return new Response(JSON.stringify({ error: "Missing username parameter" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      try {
+        const stmt = db.prepare(`
+          SELECT
+            t.tag,
+            t.tagged_by_user_id,
+            u.username as tagged_by_username,
+            COUNT(*) as tag_count
+          FROM tags t
+          JOIN users u ON t.tagged_by_user_id = u.id
+          WHERE t.tagged_entity_type = 'user'
+            AND t.tagged_entity_id = (SELECT id FROM users WHERE username = ?)
+          GROUP BY t.tag, t.tagged_by_user_id, u.username
+          ORDER BY t.tag ASC
+        `);
+
+        const tags = stmt.all(username) as any[];
+
+        // Group tags by tag name, showing who added them
+        const tagMap = new Map<string, any[]>();
+        tags.forEach(t => {
+          if (!tagMap.has(t.tag)) {
+            tagMap.set(t.tag, []);
+          }
+          tagMap.get(t.tag)?.push({
+            tagged_by_username: t.tagged_by_username,
+            is_viewer: viewerUsername ? t.tagged_by_username === viewerUsername : false
+          });
+        });
+
+        const result = Array.from(tagMap.entries()).map(([tag, taggedBy]) => ({
+          tag,
+          tagged_by: taggedBy,
+          is_own_tag: taggedBy.some(t => t.is_viewer)
+        }));
+
+        return new Response(JSON.stringify({
+          username,
+          tags: result
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Tags query error:", error);
+        return new Response(JSON.stringify({ error: "Failed to fetch tags" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/api/add-tag" && req.method === "POST") {
+      // Add a tag to a user
+      try {
+        const body = await req.json() as {
+          tagged_username: string;
+          tag: string;
+          tagged_by_username: string;
+        };
+
+        const { tagged_username, tag, tagged_by_username } = body;
+
+        if (!tagged_username || !tag || !tagged_by_username) {
+          return new Response(JSON.stringify({ error: "Missing required fields" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Get user IDs
+        const taggedUser = db.prepare("SELECT id FROM users WHERE username = ?").get(tagged_username) as any;
+        const taggedByUser = db.prepare("SELECT id FROM users WHERE username = ?").get(tagged_by_username) as any;
+
+        if (!taggedUser || !taggedByUser) {
+          return new Response(JSON.stringify({ error: "User not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Insert tag (UNIQUE constraint prevents duplicates)
+        const stmt = db.prepare(`
+          INSERT INTO tags (tagged_by_user_id, tagged_entity_type, tagged_entity_id, tag)
+          VALUES (?, 'user', ?, ?)
+          ON CONFLICT DO NOTHING
+        `);
+
+        stmt.run(taggedByUser.id, taggedUser.id, tag);
+
+        return new Response(JSON.stringify({ success: true, tag }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Add tag error:", error);
+        return new Response(JSON.stringify({ error: "Failed to add tag" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/api/remove-tag" && req.method === "POST") {
+      // Remove a tag (only if the logged-in user added it)
+      try {
+        const body = await req.json() as {
+          tagged_username: string;
+          tag: string;
+          logged_in_username: string;
+        };
+
+        const { tagged_username, tag, logged_in_username } = body;
+
+        if (!tagged_username || !tag || !logged_in_username) {
+          return new Response(JSON.stringify({ error: "Missing required fields" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Get user IDs
+        const taggedUser = db.prepare("SELECT id FROM users WHERE username = ?").get(tagged_username) as any;
+        const loggedInUser = db.prepare("SELECT id FROM users WHERE username = ?").get(logged_in_username) as any;
+
+        if (!taggedUser || !loggedInUser) {
+          return new Response(JSON.stringify({ error: "User not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Only delete if the logged-in user created this tag
+        const stmt = db.prepare(`
+          DELETE FROM tags
+          WHERE tagged_by_user_id = ?
+            AND tagged_entity_type = 'user'
+            AND tagged_entity_id = ?
+            AND tag = ?
+        `);
+
+        const result = stmt.run(loggedInUser.id, taggedUser.id, tag);
+
+        if (result.changes === 0) {
+          return new Response(JSON.stringify({ error: "Tag not found or you don't have permission to remove it" }), {
+            status: 403,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Remove tag error:", error);
+        return new Response(JSON.stringify({ error: "Failed to remove tag" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/api/tag") {
+      // Get all users and repos with a specific tag
+      const tagName = url.searchParams.get("name");
+
+      if (!tagName) {
+        return new Response(JSON.stringify({ error: "Missing tag name parameter" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      try {
+        // Get users with this tag
+        const usersStmt = db.prepare(`
+          SELECT DISTINCT
+            u.username,
+            u.avatar_url,
+            CASE
+              WHEN u.access_token IS NOT NULL THEN 'authenticated'
+              WHEN u.scanned_by IS NOT NULL THEN 'scanned'
+              ELSE 'unscanned'
+            END as user_type,
+            COUNT(DISTINCT t.id) as tag_count
+          FROM users u
+          JOIN tags t ON t.tagged_entity_id = u.id AND t.tagged_entity_type = 'user'
+          WHERE t.tag = ?
+          GROUP BY u.id, u.username, u.avatar_url, u.access_token, u.scanned_by
+          ORDER BY u.username ASC
+        `);
+
+        const users = usersStmt.all(tagName) as any[];
+
+        // Get repos with this tag (from tech stack or topics)
+        const reposStmt = db.prepare(`
+          SELECT DISTINCT
+            r.name,
+            r.description,
+            r.url,
+            r.stars,
+            u.username,
+            u.avatar_url
+          FROM repositories r
+          JOIN users u ON r.user_id = u.id
+          WHERE r.language = ? OR r.user_id IN (
+            SELECT user_id FROM tech_stack WHERE technology = ?
+          )
+          ORDER BY r.stars DESC, r.name ASC
+        `);
+
+        const repos = reposStmt.all(tagName, tagName) as any[];
+
+        return new Response(JSON.stringify({
+          tag: tagName,
+          users: users.map(u => ({
+            username: u.username,
+            avatar_url: u.avatar_url,
+            user_type: u.user_type,
+            tag_count: u.tag_count
+          })),
+          repositories: repos.map(r => ({
+            name: r.name,
+            description: r.description,
+            url: r.url,
+            stars: r.stars,
+            username: r.username
+          }))
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Tag detail query error:", error);
+        return new Response(JSON.stringify({ error: "Failed to fetch tag data" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
     if (url.pathname === "/location.html") {
       const file = Bun.file("./public/location.html");
       return new Response(file);
@@ -1376,6 +1638,11 @@ const server = Bun.serve({
 
     if (url.pathname === "/tech.html") {
       const file = Bun.file("./public/tech.html");
+      return new Response(file);
+    }
+
+    if (url.pathname === "/tag.html") {
+      const file = Bun.file("./public/tag.html");
       return new Response(file);
     }
 
