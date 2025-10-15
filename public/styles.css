@@ -1189,3 +1189,90 @@ body {
   background: #bfdbfe !important;
   border-color: #60a5fa !important;
 }
+
+/* Profile Stat Buttons */
+.profile-stat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: white;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #666;
+  font-size: 0.9em;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.profile-stat-btn span {
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.profile-stat-btn:hover {
+  background: #fafafa;
+  border-color: #1a1a1a;
+  color: #1a1a1a;
+}
+
+/* Connection Grid */
+.connection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.connection-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #e5e5e5;
+  text-decoration: none;
+  color: #1a1a1a;
+  transition: all 0.2s ease;
+  min-height: 100px;
+  justify-content: center;
+}
+
+.connection-card:hover {
+  background: white;
+  border-color: #d0d0d0;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.connection-card img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #e5e5e5;
+  transition: all 0.2s ease;
+}
+
+.connection-card img.authenticated {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+.connection-card img.scanned {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.1);
+}
+
+.connection-card img.unscanned {
+  border-color: #9ca3af;
+}
+
+.connection-card span {
+  font-size: 0.8em;
+  font-weight: 500;
+  text-align: center;
+  word-break: break-word;
+}

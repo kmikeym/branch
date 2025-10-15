@@ -34,9 +34,17 @@
             </a>
           </div>
           <div class="profile-stats">
-            <span id="followers-count">0 followers</span>
+            <span id="profile-followers-count">0 followers</span>
             <span>•</span>
-            <span id="following-count">0 following</span>
+            <span id="profile-following-count">0 following</span>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <a href="#repositories" class="profile-stat-btn">
+              <span id="repos-count">0</span> Repositories
+            </a>
+            <a href="#tech-stack" class="profile-stat-btn">
+              <span id="tech-count">0</span> Technologies
+            </a>
           </div>
           <p id="scanned-by-text" class="scanned-by-text hidden" style="margin-top: 8px; font-size: 0.9em; opacity: 0.85;"></p>
           <div id="relationship-badges" class="relationship-badges" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px;"></div>
@@ -58,64 +66,8 @@
           </div>
         </div>
 
-        <div class="stats">
-          <div class="stat-card">
-            <span class="stat-number" id="repos-count">0</span>
-            <span class="stat-label">Repositories</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-number" id="tech-count">0</span>
-            <span class="stat-label">Technologies</span>
-          </div>
-        </div>
-
-        <div class="section">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 id="repositories-header">📦 Repositories</h3>
-            <button id="scan-more-btn" class="btn-secondary hidden" style="font-size: 0.9em;">Scan More Repos</button>
-          </div>
-          <div id="repositories" class="repo-list">
-            <!-- Populated by JS -->
-          </div>
-        </div>
-
-        <div class="tech-stack">
-          <h2>Tech Stack</h2>
-          <div id="all-tech" class="tech-tags">
-            <!-- Populated by JS -->
-          </div>
-        </div>
-
-        <div class="social-section">
+        <div class="social-section" id="social-network">
           <h2>Social Network</h2>
-
-          <div class="section" id="fork-connections-section">
-            <h3>🍴 Fork Connections (<span id="fork-connections-total">0</span>)</h3>
-            <div id="fork-connections" class="fork-connections">
-              <!-- Populated by JS -->
-            </div>
-          </div>
-
-          <div class="section" id="forked-by-section">
-            <h3>⭐ Forked By (<span id="forked-by-total">0</span>)</h3>
-            <div id="forked-by" class="social-grid">
-              <!-- Populated by JS -->
-            </div>
-          </div>
-
-          <div class="section" id="contributors-section">
-            <h3>👨‍💻 Contributors to Your Repos (<span id="contributors-total">0</span>)</h3>
-            <div id="contributors" class="fork-connections">
-              <!-- Populated by JS -->
-            </div>
-          </div>
-
-          <div class="section" id="contributed-to-section">
-            <h3>🤝 You Contributed To (<span id="contributed-to-total">0</span>)</h3>
-            <div id="contributed-to" class="fork-connections">
-              <!-- Populated by JS -->
-            </div>
-          </div>
 
           <div class="section" id="social-tabs-section">
             <div class="social-tabs">
@@ -123,10 +75,10 @@
                 🤝 Mutual <span id="mutual-count">(0)</span>
               </button>
               <button class="social-tab" data-tab="following" onclick="switchSocialTab('following')">
-                ➡️ Following <span id="following-count">(0)</span>
+                ➡️ Following <span id="social-following-count">(0)</span>
               </button>
               <button class="social-tab" data-tab="followers" onclick="switchSocialTab('followers')">
-                👥 Followers <span id="followers-count">(0)</span>
+                👥 Followers <span id="social-followers-count">(0)</span>
               </button>
             </div>
 
@@ -147,6 +99,64 @@
                 <!-- Populated by JS -->
               </div>
             </div>
+          </div>
+
+          <div class="section" id="connections-tabs-section">
+            <div class="social-tabs">
+              <button class="social-tab active" data-tab="fork-connections" onclick="switchConnectionTab('fork-connections')">
+                🍴 Forked <span id="fork-connections-count">(0)</span>
+              </button>
+              <button class="social-tab" data-tab="forked-by" onclick="switchConnectionTab('forked-by')">
+                ⭐ Forked By <span id="forked-by-count">(0)</span>
+              </button>
+              <button class="social-tab" data-tab="contributors" onclick="switchConnectionTab('contributors')">
+                👨‍💻 Contributors <span id="contributors-count">(0)</span>
+              </button>
+              <button class="social-tab" data-tab="contributed-to" onclick="switchConnectionTab('contributed-to')">
+                🤝 Contributed <span id="contributed-to-count">(0)</span>
+              </button>
+            </div>
+
+            <div class="social-tab-content active" id="tab-fork-connections">
+              <div id="fork-connections" class="connection-grid">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <div class="social-tab-content" id="tab-forked-by">
+              <div id="forked-by" class="connection-grid">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <div class="social-tab-content" id="tab-contributors">
+              <div id="contributors" class="connection-grid">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <div class="social-tab-content" id="tab-contributed-to">
+              <div id="contributed-to" class="connection-grid">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section" id="repositories">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 id="repositories-header">📦 Repositories</h3>
+            <button id="scan-more-btn" class="btn-secondary hidden" style="font-size: 0.9em;">Scan More Repos</button>
+          </div>
+          <div id="repositories" class="repo-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <div class="tech-stack" id="tech-stack">
+          <h2>Tech Stack</h2>
+          <div id="all-tech" class="tech-tags">
+            <!-- Populated by JS -->
           </div>
         </div>
 
@@ -379,8 +389,8 @@
 
       profileAvatar.src = techData.avatar_url;
       profileUsername.textContent = `@${techData.username}`;
-      followersCount.textContent = `${techData.followers?.length || 0} followers`;
-      followingCount.textContent = `${techData.following?.length || 0} following`;
+      document.getElementById('profile-followers-count').textContent = `${techData.followers?.length || 0} followers`;
+      document.getElementById('profile-following-count').textContent = `${techData.following?.length || 0} following`;
 
       // Set GitHub profile link
       document.getElementById('github-profile-link').href = `https://github.com/${techData.username}`;
@@ -562,11 +572,9 @@
 
       // Display fork connections - repos this user forked from others
       const forkConnectionsContainer = document.getElementById('fork-connections');
-      const forkConnectionsTotal = document.getElementById('fork-connections-total');
+      document.getElementById('fork-connections-count').textContent = `(${techData.fork_connections?.length || 0})`;
 
       if (techData.fork_connections && techData.fork_connections.length > 0) {
-        forkConnectionsTotal.textContent = techData.fork_connections.length;
-
         // Group by owner
         const groupedForks = {};
         techData.fork_connections.forEach(fork => {
@@ -582,15 +590,11 @@
         });
 
         forkConnectionsContainer.innerHTML = Object.values(groupedForks).map(group => `
-          <div class="fork-connection-item">
-            <a href="/dashboard.html?user=${group.owner}" class="fork-connection-user">
-              <img src="${group.owner_avatar || `https://github.com/${group.owner}.png`}" alt="${group.owner}" class="${group.owner_user_type || 'unscanned'}">
-              <span>${group.owner}</span>
-            </a>
-            <div class="fork-connection-repos">
-              ${group.repos.map(repo => `<span class="fork-repo-tag">${repo}</span>`).join('')}
-            </div>
-          </div>
+          <a href="/dashboard.html?user=${group.owner}" class="connection-card" title="${group.owner} (${group.repos.length} repo${group.repos.length !== 1 ? 's' : ''})">
+            <img src="${group.owner_avatar || `https://github.com/${group.owner}.png`}" alt="${group.owner}" class="${group.owner_user_type || 'unscanned'}">
+            <span>${group.owner}</span>
+            <span style="font-size: 0.7em; color: #666;">${group.repos.length} repo${group.repos.length !== 1 ? 's' : ''}</span>
+          </a>
         `).join('');
       } else {
         forkConnectionsContainer.innerHTML = '<p class="empty-state">No fork connections</p>';
@@ -598,7 +602,6 @@
 
       // Display users who forked this user's repos
       const forkedByContainer = document.getElementById('forked-by');
-      const forkedByTotal = document.getElementById('forked-by-total');
 
       if (techData.forked_by && techData.forked_by.length > 0) {
         // Get unique forkers
@@ -616,22 +619,22 @@
         });
 
         const forkersArray = Object.values(uniqueForkers);
-        forkedByTotal.textContent = forkersArray.length;
+        document.getElementById('forked-by-count').textContent = `(${forkersArray.length})`;
 
         forkedByContainer.innerHTML = forkersArray.map(forker => `
-          <a href="/dashboard.html?user=${forker.username}" class="social-card" title="${forker.username} (forked ${forker.repos.join(', ')})">
+          <a href="/dashboard.html?user=${forker.username}" class="connection-card" title="${forker.username} (forked ${forker.repos.join(', ')})">
             <img src="${forker.avatar_url}" alt="${forker.username}" class="${forker.user_type || 'unscanned'}">
             <span>${forker.username}</span>
-            <span style="font-size: 0.8em; color: #666;">${forker.repos.length} repo${forker.repos.length !== 1 ? 's' : ''}</span>
+            <span style="font-size: 0.7em; color: #666;">${forker.repos.length} repo${forker.repos.length !== 1 ? 's' : ''}</span>
           </a>
         `).join('');
       } else {
+        document.getElementById('forked-by-count').textContent = '(0)';
         forkedByContainer.innerHTML = '<p class="empty-state">No forks</p>';
       }
 
       // Display contributors to this user's repos
       const contributorsContainer = document.getElementById('contributors');
-      const contributorsTotal = document.getElementById('contributors-total');
 
       if (techData.contributors && techData.contributors.length > 0) {
         // Group by contributor
@@ -651,28 +654,22 @@
         });
 
         const contributorsArray = Object.values(uniqueContributors);
-        contributorsTotal.textContent = contributorsArray.length;
+        document.getElementById('contributors-count').textContent = `(${contributorsArray.length})`;
 
         contributorsContainer.innerHTML = contributorsArray.map(contributor => `
-          <div class="fork-connection-item">
-            <a href="/dashboard.html?user=${contributor.username}" class="fork-connection-user">
-              <img src="${contributor.avatar_url || `https://github.com/${contributor.username}.png`}" alt="${contributor.username}" class="${contributor.user_type || 'unscanned'}">
-              <span>${contributor.username}</span>
-              <span style="font-size: 0.8em; color: #666; margin-left: 8px;">${contributor.total_contributions} contribution${contributor.total_contributions !== 1 ? 's' : ''}</span>
-            </a>
-            <div class="fork-connection-repos">
-              ${contributor.repos.map(repo => `<span class="fork-repo-tag">${repo}</span>`).join('')}
-            </div>
-          </div>
+          <a href="/dashboard.html?user=${contributor.username}" class="connection-card" title="${contributor.username} (${contributor.total_contributions} contributions)">
+            <img src="${contributor.avatar_url || `https://github.com/${contributor.username}.png`}" alt="${contributor.username}" class="${contributor.user_type || 'unscanned'}">
+            <span>${contributor.username}</span>
+            <span style="font-size: 0.7em; color: #666;">${contributor.total_contributions} contrib${contributor.total_contributions !== 1 ? 's' : ''}</span>
+          </a>
         `).join('');
       } else {
+        document.getElementById('contributors-count').textContent = '(0)';
         contributorsContainer.innerHTML = '<p class="empty-state">No contributors yet</p>';
-        contributorsTotal.textContent = '0';
       }
 
       // Display repos this user contributed to
       const contributedToContainer = document.getElementById('contributed-to');
-      const contributedToTotal = document.getElementById('contributed-to-total');
 
       if (techData.contributed_to && techData.contributed_to.length > 0) {
         // Group by owner
@@ -692,23 +689,18 @@
         });
 
         const contributionsArray = Object.values(groupedContributions);
-        contributedToTotal.textContent = contributionsArray.length;
+        document.getElementById('contributed-to-count').textContent = `(${contributionsArray.length})`;
 
         contributedToContainer.innerHTML = contributionsArray.map(group => `
-          <div class="fork-connection-item">
-            <a href="/dashboard.html?user=${group.owner}" class="fork-connection-user">
-              <img src="${group.owner_avatar || `https://github.com/${group.owner}.png`}" alt="${group.owner}" class="${group.owner_user_type || 'unscanned'}">
-              <span>${group.owner}</span>
-              <span style="font-size: 0.8em; color: #666; margin-left: 8px;">${group.total_contributions} contribution${group.total_contributions !== 1 ? 's' : ''}</span>
-            </a>
-            <div class="fork-connection-repos">
-              ${group.repos.map(repo => `<span class="fork-repo-tag">${repo}</span>`).join('')}
-            </div>
-          </div>
+          <a href="/dashboard.html?user=${group.owner}" class="connection-card" title="${group.owner} (${group.total_contributions} contributions)">
+            <img src="${group.owner_avatar || `https://github.com/${group.owner}.png`}" alt="${group.owner}" class="${group.owner_user_type || 'unscanned'}">
+            <span>${group.owner}</span>
+            <span style="font-size: 0.7em; color: #666;">${group.total_contributions} contrib${group.total_contributions !== 1 ? 's' : ''}</span>
+          </a>
         `).join('');
       } else {
+        document.getElementById('contributed-to-count').textContent = '(0)';
         contributedToContainer.innerHTML = '<p class="empty-state">No contributions to other repos</p>';
-        contributedToTotal.textContent = '0';
       }
 
       // Calculate mutual followers
@@ -716,19 +708,31 @@
       const following = techData.following || [];
       const followersSet = new Set(followers.map(f => f.username));
       const followingSet = new Set(following.map(f => f.username));
-      const mutualUsers = followers.filter(f => followingSet.has(f.username));
+      const mutualUsersSet = new Set();
+
+      const mutualUsers = followers.filter(f => {
+        if (followingSet.has(f.username)) {
+          mutualUsersSet.add(f.username);
+          return true;
+        }
+        return false;
+      });
+
+      // Filter out mutual users from followers and following lists
+      const followersOnly = followers.filter(f => !mutualUsersSet.has(f.username));
+      const followingOnly = following.filter(f => !mutualUsersSet.has(f.username));
 
       // Update tab counts
       const hasMoreFollowers = followers.length >= 100;
       const hasMoreFollowing = following.length >= 100;
 
       document.getElementById('mutual-count').textContent = `(${mutualUsers.length})`;
-      document.getElementById('following-count').innerHTML = hasMoreFollowing
-        ? `(${following.length}+) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 4px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`
-        : `(${following.length})`;
-      document.getElementById('followers-count').innerHTML = hasMoreFollowers
-        ? `(${followers.length}+) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 4px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`
-        : `(${followers.length})`;
+      document.getElementById('social-following-count').innerHTML = hasMoreFollowing
+        ? `(${followingOnly.length}+) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 4px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`
+        : `(${followingOnly.length})`;
+      document.getElementById('social-followers-count').innerHTML = hasMoreFollowers
+        ? `(${followersOnly.length}+) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 4px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`
+        : `(${followersOnly.length})`;
 
       // Display mutual followers
       const mutualContainer = document.getElementById('mutual');
@@ -743,10 +747,10 @@
         mutualContainer.innerHTML = '<p class="empty-state">No mutual followers</p>';
       }
 
-      // Display followers
+      // Display followers (excluding mutual)
       const followersContainer = document.getElementById('followers');
-      if (followers.length > 0) {
-        followersContainer.innerHTML = followers.map(follower => `
+      if (followersOnly.length > 0) {
+        followersContainer.innerHTML = followersOnly.map(follower => `
           <a href="/dashboard.html?user=${follower.username}" class="social-card" title="${follower.username}">
             <img src="${follower.avatar_url}" alt="${follower.username}" class="${follower.user_type || 'unscanned'}">
             <span>${follower.username}</span>
@@ -756,10 +760,10 @@
         followersContainer.innerHTML = '<p class="empty-state">No followers</p>';
       }
 
-      // Display following
+      // Display following (excluding mutual)
       const followingContainer = document.getElementById('following');
-      if (following.length > 0) {
-        followingContainer.innerHTML = following.map(person => `
+      if (followingOnly.length > 0) {
+        followingContainer.innerHTML = followingOnly.map(person => `
           <a href="/dashboard.html?user=${person.username}" class="social-card" title="${person.username}">
             <img src="${person.avatar_url}" alt="${person.username}" class="${person.user_type || 'unscanned'}">
             <span>${person.username}</span>
@@ -1132,18 +1136,35 @@
       document.getElementById('fork-modal').classList.add('hidden');
     }
 
-    // Tab switching function
+    // Tab switching function for social tabs
     function switchSocialTab(tabName) {
-      // Remove active class from all tabs and tab contents
-      document.querySelectorAll('.social-tab').forEach(tab => {
+      // Only affect social tabs (not connection tabs)
+      const socialTabsSection = document.getElementById('social-tabs-section');
+      socialTabsSection.querySelectorAll('.social-tab').forEach(tab => {
         tab.classList.remove('active');
       });
-      document.querySelectorAll('.social-tab-content').forEach(content => {
+      socialTabsSection.querySelectorAll('.social-tab-content').forEach(content => {
         content.classList.remove('active');
       });
 
       // Add active class to selected tab and content
-      document.querySelector(`.social-tab[data-tab="${tabName}"]`).classList.add('active');
+      socialTabsSection.querySelector(`.social-tab[data-tab="${tabName}"]`).classList.add('active');
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+    }
+
+    // Tab switching function for connection tabs
+    function switchConnectionTab(tabName) {
+      // Only affect connection tabs (not social tabs)
+      const connectionsTabsSection = document.getElementById('connections-tabs-section');
+      connectionsTabsSection.querySelectorAll('.social-tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      connectionsTabsSection.querySelectorAll('.social-tab-content').forEach(content => {
+        content.classList.remove('active');
+      });
+
+      // Add active class to selected tab and content
+      connectionsTabsSection.querySelector(`.social-tab[data-tab="${tabName}"]`).classList.add('active');
       document.getElementById(`tab-${tabName}`).classList.add('active');
     }
 
