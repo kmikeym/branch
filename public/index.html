@@ -15,12 +15,12 @@
       </div>
     </div>
     <div class="nav-right" id="nav-user-info">
-      <a href="/api/auth/github" class="btn-primary">
+      <button onclick="showPermissionsModal()" class="btn-primary" style="border: none; cursor: pointer;">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
         </svg>
         Login
-      </a>
+      </button>
     </div>
   </nav>
 
@@ -29,12 +29,12 @@
       <h1>Build more fast together</h1>
       <p class="landing-tagline">Discover developers through their tech stack. Find who's building with the technologies you love.</p>
 
-      <a href="/api/auth/github" class="btn-primary btn-large">
+      <button onclick="showPermissionsModal()" class="btn-primary btn-large" style="border: none; cursor: pointer;">
         <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
           <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
         </svg>
         Get Started with GitHub
-      </a>
+      </button>
     </div>
 
     <div class="landing-stats">
@@ -67,7 +67,60 @@
     </div>
   </div>
 
+  <!-- Permissions Modal -->
+  <div id="permissions-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🔐 Login with GitHub</h2>
+        <button class="modal-close" onclick="closePermissionsModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <h3 style="margin-top: 0;">What we're asking for:</h3>
+        <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+          <p style="margin: 0; font-weight: 500;">✅ Basic profile access (read:user)</p>
+          <p style="margin: 8px 0 0 0; color: #666; font-size: 0.9em;">Your username, avatar, and public profile info</p>
+        </div>
+
+        <h3>Why we need it:</h3>
+        <ul style="margin: 12px 0; padding-left: 20px; color: #666;">
+          <li style="margin-bottom: 8px;">GitHub limits unauthenticated requests to <strong>60/hour</strong></li>
+          <li style="margin-bottom: 8px;">Authenticated users get <strong>5,000/hour</strong> — enough to scan profiles</li>
+          <li>We only access your public data (repos, followers, tech stack)</li>
+        </ul>
+
+        <h3>What we DON'T access:</h3>
+        <ul style="margin: 12px 0; padding-left: 20px; color: #666;">
+          <li style="margin-bottom: 8px;">❌ Private repositories</li>
+          <li style="margin-bottom: 8px;">❌ Email addresses</li>
+          <li style="margin-bottom: 8px;">❌ Ability to modify your account</li>
+          <li>❌ Ability to write to your repos</li>
+        </ul>
+
+        <div style="margin-top: 24px; display: flex; gap: 12px;">
+          <a href="/api/auth/github" class="btn-primary" style="flex: 1; text-align: center; text-decoration: none;">Continue to GitHub</a>
+          <button onclick="closePermissionsModal()" class="btn-secondary" style="flex: 1;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // Permissions modal functions
+    function showPermissionsModal() {
+      document.getElementById('permissions-modal').classList.remove('hidden');
+    }
+
+    function closePermissionsModal() {
+      document.getElementById('permissions-modal').classList.add('hidden');
+    }
+
+    // Close modal when clicking outside of it
+    document.getElementById('permissions-modal')?.addEventListener('click', function(event) {
+      if (event.target.id === 'permissions-modal') {
+        closePermissionsModal();
+      }
+    });
+
     // Check if user is logged in and update nav
     async function updateNav() {
       const loggedInUser = localStorage.getItem('loggedInUser');
