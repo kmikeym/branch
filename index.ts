@@ -1760,6 +1760,118 @@ const server = Bun.serve({
       return new Response(file);
     }
 
+    if (url.pathname === "/api/relationship") {
+      // Get relationship between logged-in user and profile being viewed
+      const viewerUsername = url.searchParams.get("viewer");
+      const profileUsername = url.searchParams.get("profile");
+
+      if (!viewerUsername || !profileUsername) {
+        return new Response(JSON.stringify({ error: "Missing viewer or profile parameter" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      // Don't show relationship if viewing own profile
+      if (viewerUsername === profileUsername) {
+        return new Response(JSON.stringify({ relationships: [] }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      try {
+        const relationships = [];
+
+        // Check if viewer follows profile
+        const viewerFollowsStmt = db.prepare(`
+          SELECT 1 FROM social_connections
+          WHERE user_id = (SELECT id FROM users WHERE username = ?)
+            AND github_username = ?
+            AND connection_type = 'following'
+        `);
+        const viewerFollows = viewerFollowsStmt.get(viewerUsername, profileUsername);
+
+        // Check if profile follows viewer
+        const profileFollowsStmt = db.prepare(`
+          SELECT 1 FROM social_connections
+          WHERE user_id = (SELECT id FROM users WHERE username = ?)
+            AND github_username = ?
+            AND connection_type = 'following'
+        `);
+        const profileFollows = profileFollowsStmt.get(profileUsername, viewerUsername);
+
+        // Determine follow relationship
+        if (viewerFollows && profileFollows) {
+          relationships.push({ type: 'mutual_follow', label: 'Mutual Follow' });
+        } else if (viewerFollows) {
+          relationships.push({ type: 'following', label: 'You Follow' });
+        } else if (profileFollows) {
+          relationships.push({ type: 'follower', label: 'Follows You' });
+        }
+
+        // Check for shared repos via forks
+        const sharedForksStmt = db.prepare(`
+          SELECT COUNT(*) as count FROM (
+            SELECT repo_owner, repo_name FROM forks WHERE forker_username = ?
+            INTERSECT
+            SELECT repo_owner, repo_name FROM forks WHERE forker_username = ?
+          )
+        `);
+        const sharedForks = sharedForksStmt.get(viewerUsername, profileUsername) as any;
+        if (sharedForks.count > 0) {
+          relationships.push({ type: 'shared_forks', label: `${sharedForks.count} Shared Fork${sharedForks.count > 1 ? 's' : ''}` });
+        }
+
+        // Check if viewer has contributed to profile's repos
+        const contributedToStmt = db.prepare(`
+          SELECT COUNT(DISTINCT repo_name) as count
+          FROM contributors
+          WHERE repo_owner = ? AND contributor_username = ?
+        `);
+        const contributedTo = contributedToStmt.get(profileUsername, viewerUsername) as any;
+        if (contributedTo.count > 0) {
+          relationships.push({ type: 'contributor', label: `Contributed to ${contributedTo.count} Repo${contributedTo.count > 1 ? 's' : ''}` });
+        }
+
+        // Check if profile has contributed to viewer's repos
+        const receivedContributionsStmt = db.prepare(`
+          SELECT COUNT(DISTINCT repo_name) as count
+          FROM contributors
+          WHERE repo_owner = ? AND contributor_username = ?
+        `);
+        const receivedContributions = receivedContributionsStmt.get(viewerUsername, profileUsername) as any;
+        if (receivedContributions.count > 0) {
+          relationships.push({ type: 'received_contribution', label: `Contributed to Your ${receivedContributions.count} Repo${receivedContributions.count > 1 ? 's' : ''}` });
+        }
+
+        // Check for shared tags
+        const sharedTagsStmt = db.prepare(`
+          SELECT COUNT(DISTINCT t1.tag) as count
+          FROM tags t1
+          JOIN tags t2 ON t1.tag = t2.tag
+          WHERE t1.tagged_entity_type = 'user'
+            AND t2.tagged_entity_type = 'user'
+            AND t1.tagged_entity_id = (SELECT id FROM users WHERE username = ?)
+            AND t2.tagged_entity_id = (SELECT id FROM users WHERE username = ?)
+        `);
+        const sharedTags = sharedTagsStmt.get(viewerUsername, profileUsername) as any;
+        if (sharedTags.count > 0) {
+          relationships.push({ type: 'shared_tags', label: `${sharedTags.count} Shared Tag${sharedTags.count > 1 ? 's' : ''}` });
+        }
+
+        return new Response(JSON.stringify({ relationships }), {
+          headers: { "Content-Type": "application/json" }
+        });
+
+      } catch (error) {
+        console.error("Relationship query error:", error);
+        return new Response(JSON.stringify({ error: "Failed to fetch relationship" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
     if (url.pathname === "/api/stats") {
       // Get homepage statistics
       try {

@@ -39,6 +39,7 @@
             <span id="following-count">0 following</span>
           </div>
           <p id="scanned-by-text" class="scanned-by-text hidden" style="margin-top: 8px; font-size: 0.9em; opacity: 0.85;"></p>
+          <div id="relationship-badges" class="relationship-badges" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px;"></div>
         </div>
       </div>
 
@@ -379,8 +380,13 @@
 
       profileHeader.classList.remove('hidden');
 
-      // Display tags
+      // Display relationship badges
       const loggedInUser = localStorage.getItem('loggedInUser');
+      if (loggedInUser && loggedInUser !== username) {
+        await displayRelationships(loggedInUser, username);
+      }
+
+      // Display tags
       const isOwnProfile = username === loggedInUser;
       await displayTags(username, loggedInUser);
 
@@ -743,6 +749,31 @@
         }
       } catch (error) {
         console.error('Failed to load tags:', error);
+      }
+    }
+
+    async function displayRelationships(viewerUsername, profileUsername) {
+      try {
+        const response = await fetch(`/api/relationship?viewer=${viewerUsername}&profile=${profileUsername}`);
+        const data = await response.json();
+
+        const badgesContainer = document.getElementById('relationship-badges');
+
+        if (data.relationships && data.relationships.length > 0) {
+          badgesContainer.innerHTML = data.relationships.map(rel => {
+            // Different colors for different relationship types
+            let badgeClass = 'tech-tag-gray';
+            if (rel.type === 'mutual_follow') badgeClass = 'tech-tag-blue';
+            else if (rel.type === 'following' || rel.type === 'follower') badgeClass = 'tech-tag-green';
+            else if (rel.type === 'contributor' || rel.type === 'received_contribution') badgeClass = 'tech-tag-green';
+
+            return `<span class="tech-tag ${badgeClass}" style="font-size: 0.85em; padding: 4px 12px;">${rel.label}</span>`;
+          }).join('');
+        } else {
+          badgesContainer.innerHTML = '';
+        }
+      } catch (error) {
+        console.error('Failed to load relationships:', error);
       }
     }
 
