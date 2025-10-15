@@ -6,11 +6,24 @@ Branch analyzes your GitHub repositories to show you a complete picture of your 
 
 ## Features
 
-- 🔐 GitHub OAuth login
-- 🔍 Automatic repository scanning
-- 📊 Tech stack analysis (languages + frameworks/tools)
-- 📈 Visual breakdown with usage statistics
-- ⚡ Built with Bun for blazing fast performance
+### Core Features
+- 🔐 **GitHub OAuth login** - Secure authentication with GitHub
+- 🔍 **Automatic repository scanning** - Analyzes repos for tech stack
+- 📊 **Tech stack analysis** - Languages, frameworks, tools, and AI assistance
+- 🤖 **AI tool detection** - Identifies Claude, ChatGPT, Copilot, and more
+- 🏷️ **Smart tagging system** - Tag users and automatically tag "Vibe Coders"
+- 👥 **Social connections** - View followers, following, and tech stack overlap
+- 🌐 **GitHub network integration** - See forks and contributors
+- 📈 **Visual breakdown** - Usage statistics and repository details
+- ⚡ **Built with Bun** - Blazing fast performance
+
+### User Experience
+- 🎨 **Vibe Coding section** - Dedicated showcase for AI-assisted developers
+- 👤 **Profile names** - Shows real names (e.g., "K. Mike Merrill") not just usernames
+- 💀 **Skeleton UI** - Friendly loading states for unscanned profiles
+- ⚡ **Fast scan option** - Quick profile scan without full repo analysis
+- 🚀 **Full scan option** - Complete tech stack analysis
+- 📊 **Stats dashboard** - Total users, repos, technologies tracked
 
 ## Quick Start
 
@@ -48,9 +61,15 @@ Visit http://localhost:3000 and login with GitHub!
 ## How It Works
 
 1. **Login** - OAuth flow with GitHub
-2. **Scan** - Fetches all your repositories (max 100)
-3. **Analyze** - Counts languages and topics across repos
-4. **Display** - Shows ranked tech stack with usage stats
+2. **Scan** - Fetches your repositories and README files
+3. **Analyze** - Detects:
+   - Programming languages
+   - Frameworks and tools from topics
+   - AI tools mentioned in READMEs (Claude, ChatGPT, Copilot, etc.)
+   - GitHub services used
+4. **Tag** - Automatically tags "Vibe Coders" who use AI tools
+5. **Connect** - Imports social network (followers, following)
+6. **Display** - Shows comprehensive tech stack with usage stats
 
 ## Tech Stack
 
@@ -61,12 +80,33 @@ Visit http://localhost:3000 and login with GitHub!
 
 ## API Endpoints
 
-- `GET /` - Landing page
-- `GET /dashboard.html` - Dashboard
+### Pages
+- `GET /` - Landing page with stats and vibe coding section
+- `GET /dashboard.html` - User profile dashboard
+- `GET /tech.html` - Technology detail page
+- `GET /tag.html` - Tag detail page
+
+### Authentication
 - `GET /api/auth/github` - Start OAuth flow
 - `GET /api/auth/callback` - OAuth callback
-- `GET /api/scan?username=<user>` - Scan repos
-- `GET /api/techstack?username=<user>` - Get tech stack
+- `GET /api/logout` - Logout user
+
+### Data & Scanning
+- `GET /api/scan?username=<user>&scanner=<scanner>` - Full repo scan with README analysis
+- `GET /api/rescan-profile?username=<user>&scanner=<scanner>` - Fast profile-only scan
+- `GET /api/rescan?username=<user>&scanner=<scanner>` - Rescan existing user
+- `GET /api/techstack?username=<user>` - Get user's tech stack
+- `GET /api/stats` - Homepage statistics (users, repos, popular tech)
+- `GET /api/technology?name=<tech>` - Get users and repos for a technology
+- `GET /api/tag?name=<tag>` - Get users and repos for a tag
+
+### Social
+- `GET /api/followers?username=<user>` - Get user's followers
+- `GET /api/following?username=<user>` - Get users they follow
+
+### Tagging
+- `POST /api/tag` - Add tag to user or repo
+- `DELETE /api/tag` - Remove tag
 
 ## Database Schema
 
@@ -74,32 +114,101 @@ Visit http://localhost:3000 and login with GitHub!
 - `id` - Primary key
 - `github_id` - GitHub user ID (unique)
 - `username` - GitHub username
+- `name` - Real name (e.g., "K. Mike Merrill")
+- `bio` - Profile bio
 - `avatar_url` - Profile picture
 - `access_token` - OAuth token (encrypted in production!)
+- `user_type` - "authenticated" or "scanned"
+- `followers_count` - Number of followers
+- `following_count` - Number following
 - `created_at` - First login
 - `last_scan` - Last repo scan
+
+### repositories
+- `id` - Primary key
+- `user_id` - Foreign key to users
+- `name` - Repository name
+- `description` - Repository description
+- `url` - GitHub URL
+- `stars` - Star count
+- `language` - Primary language
+- `created_at` - Repo creation date
 
 ### tech_stack
 - `id` - Primary key
 - `user_id` - Foreign key to users
 - `technology` - Name (e.g., "JavaScript", "react")
-- `category` - "language" or "framework"
+- `category` - "language", "framework", or "topic"
 - `repo_count` - How many repos use it
 - `updated_at` - Last update
 
-## MVP Scope (Current)
+### ai_assistance
+- `id` - Primary key
+- `user_id` - Foreign key to users
+- `repo_id` - Foreign key to repositories
+- `ai_tool` - Name of AI tool (e.g., "Claude", "ChatGPT")
 
-✅ Feature 1: GitHub OAuth Login
-✅ Feature 2: Auto-Scan on Login
-✅ Feature 3: Display Tech Stack
+### services
+- `id` - Primary key
+- `user_id` - Foreign key to users
+- `service_name` - GitHub service name
 
-## Future Ideas (Post-MVP)
+### tags
+- `id` - Primary key
+- `tagged_by_user_id` - Who added the tag
+- `tagged_entity_type` - "user" or "repository"
+- `tagged_entity_id` - ID of tagged entity
+- `tag` - Tag text (e.g., "Vibe Coder")
 
-- View other users' tech stacks
-- Follow developers and get recommendations
+### social_connections
+- `id` - Primary key
+- `user_id` - Foreign key to users
+- `connection_user_id` - Foreign key to connected user
+- `connection_type` - "follower" or "following"
+
+### forks
+- `id` - Primary key
+- `repo_id` - Foreign key to repositories
+- `forked_from_user` - Original user
+- `forked_from_repo` - Original repo name
+
+### contributors
+- `id` - Primary key
+- `repo_id` - Foreign key to repositories
+- `contributor_username` - GitHub username
+- `contributions` - Number of contributions
+
+## Implementation Status
+
+### ✅ Completed Features
+
+**Core MVP**
+- ✅ GitHub OAuth Login
+- ✅ Auto-Scan on Login
+- ✅ Display Tech Stack
+
+**Extended Features**
+- ✅ View other users' tech stacks
+- ✅ Social connections (followers/following)
+- ✅ AI tool detection from READMEs
+- ✅ Smart tagging system
+- ✅ Auto-tagging for "Vibe Coders"
+- ✅ Technology and tag detail pages
+- ✅ Homepage stats dashboard
+- ✅ Skeleton UI for unscanned profiles (Issue #2)
+- ✅ Profile names instead of usernames
+- ✅ Fast profile scan option
+- ✅ Vibe Coding section on homepage
+- ✅ Repository tracking with forks and contributors
+
+### 🚧 Future Ideas
+
 - Track tech stack changes over time
+- Export/share your tech stack as image
+- Technology recommendations
+- Developer discovery based on tech overlap
 - Integration with GitHub Graph Spider
-- Export/share your tech stack
+- Advanced filtering and search
 
 ## Deployment
 
