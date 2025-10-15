@@ -70,16 +70,19 @@
           <h2>Social Network</h2>
 
           <div class="section" id="social-tabs-section">
-            <div class="social-tabs">
-              <button class="social-tab active" data-tab="mutual" onclick="switchSocialTab('mutual')">
-                🤝 Mutual <span id="mutual-count">(0)</span>
-              </button>
-              <button class="social-tab" data-tab="following" onclick="switchSocialTab('following')">
-                ➡️ Following <span id="social-following-count">(0)</span>
-              </button>
-              <button class="social-tab" data-tab="followers" onclick="switchSocialTab('followers')">
-                👥 Followers <span id="social-followers-count">(0)</span>
-              </button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div class="social-tabs" style="margin-bottom: 0;">
+                <button class="social-tab active" data-tab="mutual" onclick="switchSocialTab('mutual')">
+                  🤝 Mutual <span id="mutual-count">(0)</span>
+                </button>
+                <button class="social-tab" data-tab="following" onclick="switchSocialTab('following')">
+                  ➡️ Following <span id="social-following-count">(0)</span>
+                </button>
+                <button class="social-tab" data-tab="followers" onclick="switchSocialTab('followers')">
+                  👥 Followers <span id="social-followers-count">(0)</span>
+                </button>
+              </div>
+              <button id="scan-more-social-btn" class="btn-secondary hidden" style="font-size: 0.9em;">Scan More Socials</button>
             </div>
 
             <div class="social-tab-content active" id="tab-mutual">
@@ -722,9 +725,19 @@
       const followersOnly = followers.filter(f => !mutualUsersSet.has(f.username));
       const followingOnly = following.filter(f => !mutualUsersSet.has(f.username));
 
-      // Update tab counts
+      // Update tab counts and button logic for social
       const hasMoreFollowers = followers.length >= 100;
       const hasMoreFollowing = following.length >= 100;
+      const scanMoreSocialBtn = document.getElementById('scan-more-social-btn');
+
+      // Show "Scan More Socials" button if there are incomplete followers/following
+      if (hasMoreFollowers || hasMoreFollowing) {
+        scanMoreSocialBtn.textContent = 'Scan More Socials';
+        scanMoreSocialBtn.classList.remove('hidden');
+        scanMoreSocialBtn.onclick = rescanSocial;
+      } else {
+        scanMoreSocialBtn.classList.add('hidden');
+      }
 
       document.getElementById('mutual-count').textContent = `(${mutualUsers.length})`;
       document.getElementById('social-following-count').innerHTML = hasMoreFollowing
