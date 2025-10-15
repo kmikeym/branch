@@ -443,11 +443,14 @@
 
       if (techData.has_more_repos) {
         reposHeader.innerHTML = `📦 Repositories (${techData.repos_scanned} of ${techData.total_repos}) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 8px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`;
+        scanMoreBtn.textContent = 'Scan More Repos';
         scanMoreBtn.classList.remove('hidden');
         scanMoreBtn.onclick = scanMoreRepos;
       } else if (techData.total_repos > 0) {
-        reposHeader.textContent = `📦 Repositories (${techData.total_repos})`;
-        scanMoreBtn.classList.add('hidden');
+        reposHeader.innerHTML = `📦 Repositories (${techData.total_repos}) <span style="display: inline-block; width: 8px; height: 8px; background: #34c759; border-radius: 50%; margin-left: 8px; box-shadow: 0 0 8px rgba(52, 199, 89, 0.6);"></span>`;
+        scanMoreBtn.textContent = 'Rescan Repos';
+        scanMoreBtn.classList.remove('hidden');
+        scanMoreBtn.onclick = scanMoreRepos;
       } else {
         reposHeader.textContent = '📦 Repositories';
         scanMoreBtn.classList.add('hidden');
@@ -729,17 +732,27 @@
       const hasMoreFollowers = followers.length >= 100;
       const hasMoreFollowing = following.length >= 100;
       const scanMoreSocialBtn = document.getElementById('scan-more-social-btn');
+      const hasSocials = followers.length > 0 || following.length > 0;
 
-      // Show "Scan More Socials" button if there are incomplete followers/following
+      // Show button with appropriate text and behavior
       if (hasMoreFollowers || hasMoreFollowing) {
         scanMoreSocialBtn.textContent = 'Scan More Socials';
+        scanMoreSocialBtn.classList.remove('hidden');
+        scanMoreSocialBtn.onclick = rescanSocial;
+      } else if (hasSocials) {
+        scanMoreSocialBtn.textContent = 'Rescan Socials';
         scanMoreSocialBtn.classList.remove('hidden');
         scanMoreSocialBtn.onclick = rescanSocial;
       } else {
         scanMoreSocialBtn.classList.add('hidden');
       }
 
-      document.getElementById('mutual-count').textContent = `(${mutualUsers.length})`;
+      // Add green glow to mutual count when fully scanned
+      const mutualGlow = !hasMoreFollowers && !hasMoreFollowing && hasSocials
+        ? ' <span style="display: inline-block; width: 8px; height: 8px; background: #34c759; border-radius: 50%; margin-left: 4px; box-shadow: 0 0 8px rgba(52, 199, 89, 0.6);"></span>'
+        : '';
+
+      document.getElementById('mutual-count').innerHTML = `(${mutualUsers.length})${mutualGlow}`;
       document.getElementById('social-following-count').innerHTML = hasMoreFollowing
         ? `(${followingOnly.length}+) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 4px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`
         : `(${followingOnly.length})`;
