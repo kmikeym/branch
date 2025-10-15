@@ -329,7 +329,7 @@
       document.getElementById('scan-user-btn').onclick = scanRepositories;
     }
 
-    function displayResults(scanData, techData) {
+    async function displayResults(scanData, techData) {
       document.getElementById('loading').classList.add('hidden');
       document.getElementById('results').classList.remove('hidden');
 
