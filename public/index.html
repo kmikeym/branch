@@ -213,8 +213,8 @@
             recentScannedContainer.innerHTML = '<p class="empty-state">No scans yet</p>';
           }
 
-          // Filter vibe coding technologies (AI-related tools)
-          const vibeCodingTools = ['Claude', 'Claude Code', 'ChatGPT', 'GitHub Copilot', 'Cursor', 'AI Assisted'];
+          // Filter vibe coding technologies (AI-related tools and tags)
+          const vibeCodingTools = ['Claude', 'Claude Code', 'ChatGPT', 'GitHub Copilot', 'Cursor', 'AI Assisted', 'Vibe Coder'];
           const vibeCodingTech = data.popular_tech.filter(tech =>
             vibeCodingTools.includes(tech.name)
           );
