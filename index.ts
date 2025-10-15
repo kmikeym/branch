@@ -729,6 +729,36 @@ const server = Bun.serve({
           // Continue even if social connections fail
         }
 
+        // Auto-tag as "Vibe Coder" if AI tools were detected
+        try {
+          const aiToolsDetected = db.prepare(`
+            SELECT COUNT(DISTINCT ai_tool) as count
+            FROM ai_assistance
+            WHERE user_id = ?
+          `).get(user.id) as any;
+
+          if (aiToolsDetected.count > 0) {
+            // Auto-tag by the system (use the first authenticated user as tagger, or self-tag)
+            let taggerId = user.id; // Default to self-tag
+            if (scannerUsername) {
+              const scannerUser = db.prepare("SELECT id FROM users WHERE username = ?").get(scannerUsername) as any;
+              if (scannerUser) {
+                taggerId = scannerUser.id;
+              }
+            }
+
+            // Add "Vibe Coder" tag if not already present
+            db.prepare(`
+              INSERT INTO tags (tagged_by_user_id, tagged_entity_type, tagged_entity_id, tag)
+              VALUES (?, 'user', ?, 'Vibe Coder')
+              ON CONFLICT DO NOTHING
+            `).run(taggerId, user.id);
+          }
+        } catch (error) {
+          console.error("Error auto-tagging vibe coder:", error);
+          // Continue even if tagging fails
+        }
+
         return new Response(JSON.stringify({
           success: true,
           repos_scanned: repos.length,
