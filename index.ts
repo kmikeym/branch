@@ -1135,6 +1135,120 @@ const server = Bun.serve({
       }
     }
 
+    if (url.pathname === "/api/rescan-profile") {
+      // Rescan only extended profile data (name, bio, company, email, blog, twitter, created_at)
+      const username = url.searchParams.get("username");
+
+      if (!username) {
+        return new Response(JSON.stringify({ error: "Missing username" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      try {
+        // Get user
+        const user = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as any;
+        if (!user) {
+          return new Response(JSON.stringify({ error: "User not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Get access token (prefer user's own token, fallback to any authenticated user's token)
+        let accessToken = user.access_token;
+        if (!accessToken) {
+          // Try to get any access token for API access
+          const anyUserStmt = db.prepare("SELECT access_token FROM users WHERE access_token IS NOT NULL LIMIT 1");
+          const anyUser = anyUserStmt.get() as any;
+          if (anyUser) {
+            accessToken = anyUser.access_token;
+          }
+        }
+
+        if (!accessToken) {
+          return new Response(JSON.stringify({
+            error: "Authentication required"
+          }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Fetch fresh profile data from GitHub
+        const profileResponse = await fetch(`https://api.github.com/users/${username}`, {
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Accept": "application/vnd.github.v3+json"
+          }
+        });
+
+        if (!profileResponse.ok) {
+          return new Response(JSON.stringify({ error: "Failed to fetch profile from GitHub" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        const profileData = await profileResponse.json() as {
+          name?: string;
+          bio?: string;
+          company?: string;
+          email?: string;
+          blog?: string;
+          twitter_username?: string;
+          created_at?: string;
+        };
+
+        // Update user record with fresh profile data
+        const updateStmt = db.prepare(`
+          UPDATE users
+          SET name = ?,
+              bio = ?,
+              company = ?,
+              email = ?,
+              blog = ?,
+              twitter_username = ?,
+              github_created_at = ?
+          WHERE username = ?
+        `);
+
+        updateStmt.run(
+          profileData.name || null,
+          profileData.bio || null,
+          profileData.company || null,
+          profileData.email || null,
+          profileData.blog || null,
+          profileData.twitter_username || null,
+          profileData.created_at || null,
+          username
+        );
+
+        return new Response(JSON.stringify({
+          success: true,
+          updated_fields: {
+            name: profileData.name || null,
+            bio: profileData.bio || null,
+            company: profileData.company || null,
+            email: profileData.email || null,
+            blog: profileData.blog || null,
+            twitter_username: profileData.twitter_username || null,
+            github_created_at: profileData.created_at || null
+          }
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+
+      } catch (error) {
+        console.error("Rescan profile error:", error);
+        return new Response(JSON.stringify({ error: "Profile rescan failed" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
     if (url.pathname === "/api/techstack") {
       // Get tech stack for user
       const username = url.searchParams.get("username");

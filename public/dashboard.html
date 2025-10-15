@@ -175,6 +175,7 @@
         <div class="rescan-section">
           <p id="last-scan-text" class="last-scan-text">Last scanned: Never</p>
           <div style="display: flex; gap: 12px; margin-top: 12px;">
+            <button id="rescan-profile-btn" class="btn-secondary" style="flex: 1;">Rescan Profile</button>
             <button id="rescan-repos-btn" class="btn-secondary" style="flex: 1;">Rescan Repos</button>
             <button id="rescan-social-btn" class="btn-secondary" style="flex: 1;">Rescan Social</button>
           </div>
@@ -905,6 +906,7 @@
       }
 
       // Setup rescan buttons
+      document.getElementById('rescan-profile-btn').addEventListener('click', rescanProfile);
       document.getElementById('rescan-repos-btn').addEventListener('click', rescanRepos);
       document.getElementById('rescan-social-btn').addEventListener('click', rescanSocial);
     }
@@ -1153,6 +1155,32 @@
         alert(`Failed to rescan social: ${error.message}`);
         rescanSocialBtn.textContent = originalText;
         rescanSocialBtn.disabled = false;
+      }
+    }
+
+    async function rescanProfile() {
+      const rescanProfileBtn = document.getElementById('rescan-profile-btn');
+      const originalText = rescanProfileBtn.textContent;
+
+      rescanProfileBtn.textContent = 'Scanning...';
+      rescanProfileBtn.disabled = true;
+
+      try {
+        const response = await fetch(`/api/rescan-profile?username=${username}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Profile rescan failed');
+        }
+
+        // Reload the page data to show updated profile info
+        await loadExistingData();
+
+      } catch (error) {
+        console.error(error);
+        alert(`Failed to rescan profile: ${error.message}`);
+        rescanProfileBtn.textContent = originalText;
+        rescanProfileBtn.disabled = false;
       }
     }
 
