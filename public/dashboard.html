@@ -411,7 +411,7 @@
       const scanMoreBtn = document.getElementById('scan-more-btn');
 
       if (techData.has_more_repos) {
-        reposHeader.textContent = `📦 Repositories (${techData.repos_scanned} of ${techData.total_repos})`;
+        reposHeader.innerHTML = `📦 Repositories (${techData.repos_scanned} of ${techData.total_repos}) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 8px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`;
         scanMoreBtn.classList.remove('hidden');
         scanMoreBtn.onclick = scanMoreRepos;
       } else if (techData.total_repos > 0) {
@@ -425,23 +425,53 @@
       // Display repositories
       const reposContainer = document.getElementById('repositories');
       if (techData.repositories && techData.repositories.length > 0) {
-        reposContainer.innerHTML = techData.repositories.map((repo, index) => `
+        // Create a map of repos to their contributors
+        const repoContributors = {};
+        if (techData.contributors) {
+          techData.contributors.forEach(contrib => {
+            if (!repoContributors[contrib.repo_name]) {
+              repoContributors[contrib.repo_name] = [];
+            }
+            repoContributors[contrib.repo_name].push(contrib);
+          });
+        }
+
+        reposContainer.innerHTML = techData.repositories.map((repo, index) => {
+          const contributors = repoContributors[repo.name] || [];
+          const contributorAvatars = contributors.slice(0, 3).map(c =>
+            `<img src="${c.avatar_url || `https://github.com/${c.username}.png`}"
+                  alt="${c.username}"
+                  class="${c.user_type || 'unscanned'}"
+                  title="${c.username} (${c.contributions} contributions)"
+                  style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; margin-left: -8px;">`
+          ).join('');
+
+          return `
           <div class="repo-item">
             <div class="repo-header">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <a href="#" class="repo-name" data-repo-index="${index}" onclick="openForkModal(event, ${index})">${repo.name}</a>
-                <a href="${repo.url}" target="_blank" class="github-icon-link" title="View on GitHub" onclick="event.stopPropagation()">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <a href="#" class="repo-name" data-repo-index="${index}" onclick="openForkModal(event, ${index})">${repo.name}</a>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
+                ${repo.stars > 0 ? `<span class="repo-stars">⭐ ${repo.stars}</span>` : '<span></span>'}
+                <a href="${repo.url}" target="_blank" class="github-icon-link" title="View on GitHub" onclick="event.stopPropagation()" style="padding: 2px;">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
                   </svg>
                 </a>
               </div>
-              ${repo.stars > 0 ? `<span class="repo-stars">⭐ ${repo.stars}</span>` : ''}
             </div>
             ${repo.description ? `<p class="repo-description">${repo.description}</p>` : ''}
-            ${repo.language ? `<span class="repo-language">${repo.language}</span>` : ''}
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
+              ${repo.language ? `<span class="repo-language">${repo.language}</span>` : '<span></span>'}
+              ${contributors.length > 0 ? `
+                <div style="display: flex; align-items: center; padding-left: 8px;">
+                  ${contributorAvatars}
+                  ${contributors.length > 3 ? `<span style="font-size: 0.7em; color: #999; margin-left: 4px;">+${contributors.length - 3}</span>` : ''}
+                </div>
+              ` : ''}
+            </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
 
         // Store repos data globally for modal access
         window.currentReposData = techData.repositories;
@@ -666,9 +696,17 @@
       // Display followers
       const followersContainer = document.getElementById('followers');
       const followersTotal = document.getElementById('followers-total');
+      const followersSection = document.getElementById('followers-section');
 
       if (techData.followers && techData.followers.length > 0) {
-        followersTotal.textContent = techData.followers.length;
+        const hasMoreFollowers = techData.followers.length >= 100;
+        const followersHeader = followersSection.querySelector('h3');
+        if (hasMoreFollowers) {
+          followersHeader.innerHTML = `👥 Followers (<span id="followers-total">${techData.followers.length}+</span>) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 8px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`;
+        } else {
+          followersHeader.innerHTML = `👥 Followers (<span id="followers-total">${techData.followers.length}</span>)`;
+        }
+
         followersContainer.innerHTML = techData.followers.map(follower => `
           <a href="/dashboard.html?user=${follower.username}" class="social-card" title="${follower.username}">
             <img src="${follower.avatar_url}" alt="${follower.username}" class="${follower.user_type || 'unscanned'}">
@@ -682,9 +720,17 @@
       // Display following
       const followingContainer = document.getElementById('following');
       const followingTotal = document.getElementById('following-total');
+      const followingSection = document.getElementById('following-section');
 
       if (techData.following && techData.following.length > 0) {
-        followingTotal.textContent = techData.following.length;
+        const hasMoreFollowing = techData.following.length >= 100;
+        const followingHeader = followingSection.querySelector('h3');
+        if (hasMoreFollowing) {
+          followingHeader.innerHTML = `➡️ Following (<span id="following-total">${techData.following.length}+</span>) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 8px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`;
+        } else {
+          followingHeader.innerHTML = `➡️ Following (<span id="following-total">${techData.following.length}</span>)`;
+        }
+
         followingContainer.innerHTML = techData.following.map(person => `
           <a href="/dashboard.html?user=${person.username}" class="social-card" title="${person.username}">
             <img src="${person.avatar_url}" alt="${person.username}" class="${person.user_type || 'unscanned'}">
@@ -736,8 +782,22 @@
         if (data.tags && data.tags.length > 0) {
           tagsContainer.innerHTML = data.tags.map(tagData => {
             const isOwnTag = tagData.is_own_tag;
-            const colorClass = isOwnTag ? 'tag-green' : 'tag-grey';
-            const canRemove = tagData.tagged_by.some(t => t.is_viewer);
+            const isViewerTag = tagData.tagged_by.some(t => t.is_viewer);
+
+            // Blue for viewer's own tags, green for profile owner's tags, grey for others
+            let colorClass = 'tag-grey';
+            if (isViewerTag && username === viewerUsername) {
+              // Viewing own profile and tagged yourself = green
+              colorClass = 'tag-green';
+            } else if (isViewerTag) {
+              // You tagged someone else = blue
+              colorClass = 'tag-blue';
+            } else if (isOwnTag) {
+              // Profile owner tagged themselves = green
+              colorClass = 'tag-green';
+            }
+
+            const canRemove = isViewerTag;
 
             return `
               <span class="tech-tag tag-user ${colorClass}">
