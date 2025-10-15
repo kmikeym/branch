@@ -201,6 +201,24 @@ Simple deployment with predictable pricing.
 
 4. **Update GitHub OAuth callback** to your DO app URL
 
+### Troubleshooting Deployments
+
+**If deployments are stuck or failing:**
+
+1. **Check Railway Status First:** https://status.railway.app/
+   - Railway sometimes has platform outages that affect all users
+   - If there's an active incident, just wait for it to resolve
+   - Don't waste time debugging if it's a Railway infrastructure issue!
+
+2. **Check deployment logs:**
+   - Click "View Logs" on the stuck deployment
+   - Look for actual error messages (not just "Initializing")
+
+3. **Common issues:**
+   - Missing environment variables
+   - Database volume not mounted correctly
+   - Code syntax errors (should show in build logs)
+
 ### Post-Deployment Checklist
 
 - [ ] Update GitHub OAuth callback URL to production domain
