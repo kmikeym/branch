@@ -73,6 +73,14 @@
     </div>
 
     <div class="landing-section">
+      <h2>🎨 Vibe Coding</h2>
+      <p style="color: #666; margin-bottom: 20px;">Developers building with AI assistance</p>
+      <div id="vibe-coding-tech" class="tech-tags">
+        <div class="loading-placeholder">Loading...</div>
+      </div>
+    </div>
+
+    <div class="landing-section">
       <h2>Popular Technologies</h2>
       <div id="popular-tech" class="tech-tags">
         <div class="loading-placeholder">Loading...</div>
@@ -205,10 +213,32 @@
             recentScannedContainer.innerHTML = '<p class="empty-state">No scans yet</p>';
           }
 
-          // Display popular technologies
+          // Filter vibe coding technologies (AI-related tools)
+          const vibeCodingTools = ['Claude', 'Claude Code', 'ChatGPT', 'GitHub Copilot', 'Cursor', 'AI Assisted'];
+          const vibeCodingTech = data.popular_tech.filter(tech =>
+            vibeCodingTools.includes(tech.name)
+          );
+
+          // Display vibe coding technologies
+          const vibeCodingContainer = document.getElementById('vibe-coding-tech');
+          if (vibeCodingTech && vibeCodingTech.length > 0) {
+            vibeCodingContainer.innerHTML = vibeCodingTech.map(tech => `
+              <a href="/tech.html?tag=${encodeURIComponent(tech.name)}" class="tech-tag tech-tag-${tech.color}">
+                ${tech.name} <span class="tech-tag-count">${tech.user_count}</span>
+              </a>
+            `).join('');
+          } else {
+            vibeCodingContainer.innerHTML = '<p class="empty-state">No vibe coders yet. Be the first!</p>';
+          }
+
+          // Display popular technologies (excluding vibe coding tools to avoid duplication)
+          const nonVibeTech = data.popular_tech.filter(tech =>
+            !vibeCodingTools.includes(tech.name)
+          );
+
           const popularTechContainer = document.getElementById('popular-tech');
-          if (data.popular_tech && data.popular_tech.length > 0) {
-            popularTechContainer.innerHTML = data.popular_tech.map(tech => `
+          if (nonVibeTech && nonVibeTech.length > 0) {
+            popularTechContainer.innerHTML = nonVibeTech.map(tech => `
               <a href="/tech.html?tag=${encodeURIComponent(tech.name)}" class="tech-tag tech-tag-${tech.color}">
                 ${tech.name} <span class="tech-tag-count">${tech.user_count}</span>
               </a>
