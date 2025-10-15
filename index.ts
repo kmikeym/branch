@@ -39,6 +39,20 @@ try {
   // Column already exists, ignore error
 }
 
+// Add extended profile columns (migration)
+try {
+  db.run(`ALTER TABLE users ADD COLUMN name TEXT`);
+  db.run(`ALTER TABLE users ADD COLUMN bio TEXT`);
+  db.run(`ALTER TABLE users ADD COLUMN company TEXT`);
+  db.run(`ALTER TABLE users ADD COLUMN email TEXT`);
+  db.run(`ALTER TABLE users ADD COLUMN blog TEXT`);
+  db.run(`ALTER TABLE users ADD COLUMN twitter_username TEXT`);
+  db.run(`ALTER TABLE users ADD COLUMN github_created_at DATETIME`);
+  console.log("✅ Added extended profile columns");
+} catch (e) {
+  // Columns already exist, ignore error
+}
+
 db.run(`
   CREATE TABLE IF NOT EXISTS tech_stack (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -240,20 +254,48 @@ const server = Bun.serve({
           login: string;
           avatar_url: string;
           location?: string;
+          name?: string;
+          bio?: string;
+          company?: string;
+          email?: string;
+          blog?: string;
+          twitter_username?: string;
+          created_at?: string;
         };
 
-        // Store or update user in database
+        // Store or update user in database with extended profile data
         const stmt = db.prepare(`
-          INSERT INTO users (github_id, username, avatar_url, access_token, github_location, location)
-          VALUES (?, ?, ?, ?, ?, ?)
+          INSERT INTO users (github_id, username, avatar_url, access_token, github_location, location, name, bio, company, email, blog, twitter_username, github_created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(github_id) DO UPDATE SET
             access_token = excluded.access_token,
             avatar_url = excluded.avatar_url,
             github_location = excluded.github_location,
-            location = COALESCE(location, excluded.github_location)
+            location = COALESCE(location, excluded.github_location),
+            name = excluded.name,
+            bio = excluded.bio,
+            company = excluded.company,
+            email = excluded.email,
+            blog = excluded.blog,
+            twitter_username = excluded.twitter_username,
+            github_created_at = excluded.github_created_at
         `);
 
-        stmt.run(userData.id, userData.login, userData.avatar_url, accessToken, userData.location || null, userData.location || null);
+        stmt.run(
+          userData.id,
+          userData.login,
+          userData.avatar_url,
+          accessToken,
+          userData.location || null,
+          userData.location || null,
+          userData.name || null,
+          userData.bio || null,
+          userData.company || null,
+          userData.email || null,
+          userData.blog || null,
+          userData.twitter_username || null,
+          userData.created_at || null
+        );
 
         // Redirect to dashboard with user ID
         return Response.redirect(`/dashboard.html?user=${userData.login}`);
@@ -330,14 +372,35 @@ const server = Bun.serve({
             login: string;
             avatar_url: string;
             location?: string;
+            name?: string;
+            bio?: string;
+            company?: string;
+            email?: string;
+            blog?: string;
+            twitter_username?: string;
+            created_at?: string;
           };
 
-          // Create user record without their own access token, but track who scanned them
+          // Create user record without their own access token, but track who scanned them and store extended profile data
           const createStmt = db.prepare(`
-            INSERT INTO users (github_id, username, avatar_url, github_location, location, scanned_by)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO users (github_id, username, avatar_url, github_location, location, scanned_by, name, bio, company, email, blog, twitter_username, github_created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `);
-          createStmt.run(userInfo.id, userInfo.login, userInfo.avatar_url, userInfo.location || null, userInfo.location || null, scannerUsername || null);
+          createStmt.run(
+            userInfo.id,
+            userInfo.login,
+            userInfo.avatar_url,
+            userInfo.location || null,
+            userInfo.location || null,
+            scannerUsername || null,
+            userInfo.name || null,
+            userInfo.bio || null,
+            userInfo.company || null,
+            userInfo.email || null,
+            userInfo.blog || null,
+            userInfo.twitter_username || null,
+            userInfo.created_at || null
+          );
 
           targetUser = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as any;
         }
@@ -1083,9 +1146,9 @@ const server = Bun.serve({
         });
       }
 
-      // Get user info
+      // Get user info including extended profile data
       const userStmt = db.prepare(`
-        SELECT username, avatar_url, last_scan, location, access_token, scanned_by, total_repos
+        SELECT username, avatar_url, last_scan, location, access_token, scanned_by, total_repos, name, bio, company, email, blog, twitter_username, github_created_at
         FROM users
         WHERE username = ?
       `);
@@ -1275,6 +1338,13 @@ const server = Bun.serve({
         total_repos: userData.total_repos || 0,
         repos_scanned: reposResults.length,
         has_more_repos: (userData.total_repos || 0) > reposResults.length,
+        name: userData.name,
+        bio: userData.bio,
+        company: userData.company,
+        email: userData.email,
+        blog: userData.blog,
+        twitter_username: userData.twitter_username,
+        github_created_at: userData.github_created_at,
         followers: followersResults.map((f: any) => ({
           username: f.github_username,
           avatar_url: f.avatar_url,

@@ -33,7 +33,16 @@
               </svg>
             </a>
           </div>
-          <div class="profile-stats">
+          <h3 id="profile-name" style="margin: 4px 0 0 0; font-size: 1.1em; font-weight: 500; color: #666;"></h3>
+          <p id="profile-bio" style="margin: 8px 0 0 0; color: #666; line-height: 1.4;"></p>
+          <div id="profile-meta" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9em; color: #666;">
+            <span id="profile-company" style="display: none;"></span>
+            <span id="profile-email" style="display: none;"></span>
+            <span id="profile-blog" style="display: none;"></span>
+            <span id="profile-twitter" style="display: none;"></span>
+            <span id="profile-member-since" style="display: none;"></span>
+          </div>
+          <div class="profile-stats" style="margin-top: 12px;">
             <span id="profile-followers-count">0 followers</span>
             <span>•</span>
             <span id="profile-following-count">0 following</span>
@@ -397,6 +406,74 @@
 
       // Set GitHub profile link
       document.getElementById('github-profile-link').href = `https://github.com/${techData.username}`;
+
+      // Display extended profile data
+      const profileName = document.getElementById('profile-name');
+      const profileBio = document.getElementById('profile-bio');
+      const profileCompany = document.getElementById('profile-company');
+      const profileEmail = document.getElementById('profile-email');
+      const profileBlog = document.getElementById('profile-blog');
+      const profileTwitter = document.getElementById('profile-twitter');
+      const profileMemberSince = document.getElementById('profile-member-since');
+
+      // Name
+      if (techData.name) {
+        profileName.textContent = techData.name;
+        profileName.style.display = 'block';
+      } else {
+        profileName.style.display = 'none';
+      }
+
+      // Bio
+      if (techData.bio) {
+        profileBio.textContent = techData.bio;
+        profileBio.style.display = 'block';
+      } else {
+        profileBio.style.display = 'none';
+      }
+
+      // Company
+      if (techData.company) {
+        profileCompany.innerHTML = `🏢 ${techData.company}`;
+        profileCompany.style.display = 'inline';
+      } else {
+        profileCompany.style.display = 'none';
+      }
+
+      // Email
+      if (techData.email) {
+        profileEmail.innerHTML = `📧 <a href="mailto:${techData.email}" style="color: inherit; text-decoration: none;">${techData.email}</a>`;
+        profileEmail.style.display = 'inline';
+      } else {
+        profileEmail.style.display = 'none';
+      }
+
+      // Blog/Website
+      if (techData.blog) {
+        const blogUrl = techData.blog.startsWith('http') ? techData.blog : `https://${techData.blog}`;
+        profileBlog.innerHTML = `🔗 <a href="${blogUrl}" target="_blank" style="color: inherit; text-decoration: none;">${techData.blog}</a>`;
+        profileBlog.style.display = 'inline';
+      } else {
+        profileBlog.style.display = 'none';
+      }
+
+      // Twitter
+      if (techData.twitter_username) {
+        profileTwitter.innerHTML = `🐦 <a href="https://twitter.com/${techData.twitter_username}" target="_blank" style="color: inherit; text-decoration: none;">@${techData.twitter_username}</a>`;
+        profileTwitter.style.display = 'inline';
+      } else {
+        profileTwitter.style.display = 'none';
+      }
+
+      // Member since (GitHub created at)
+      if (techData.github_created_at) {
+        const createdDate = new Date(techData.github_created_at);
+        const year = createdDate.getFullYear();
+        profileMemberSince.textContent = `📅 Member since ${year}`;
+        profileMemberSince.style.display = 'inline';
+      } else {
+        profileMemberSince.style.display = 'none';
+      }
 
       // Apply user type class for CRT glow effect
       profileAvatar.className = 'profile-avatar'; // Reset classes
