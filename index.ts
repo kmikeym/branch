@@ -464,6 +464,10 @@ const server = Bun.serve({
           }
         }
 
+        // Update last scan time and total repos count EARLY to avoid timeout issues
+        // The rest of the scan (contributors, READMEs, social) continues but user gets immediate feedback
+        db.run("UPDATE users SET last_scan = CURRENT_TIMESTAMP, total_repos = ? WHERE id = ?", [totalRepoCount, user.id]);
+
         // Fetch contributors for each repository (limit to top 10 per repo to avoid API limits)
         const contributorInsertStmt = db.prepare(`
           INSERT INTO contributors (repo_owner, repo_name, contributor_username, contributions)
@@ -661,9 +665,6 @@ const server = Bun.serve({
           console.error("Error fetching social connections:", error);
           // Continue even if social connections fail
         }
-
-        // Update last scan time and total repos count
-        db.run("UPDATE users SET last_scan = CURRENT_TIMESTAMP, total_repos = ? WHERE id = ?", [totalRepoCount, user.id]);
 
         return new Response(JSON.stringify({
           success: true,
