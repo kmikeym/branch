@@ -134,7 +134,10 @@
 
         <div class="rescan-section">
           <p id="last-scan-text" class="last-scan-text">Last scanned: Never</p>
-          <button id="rescan-btn" class="btn-secondary">Rescan Now</button>
+          <div style="display: flex; gap: 12px; margin-top: 12px;">
+            <button id="rescan-repos-btn" class="btn-secondary" style="flex: 1;">Rescan Repos</button>
+            <button id="rescan-social-btn" class="btn-secondary" style="flex: 1;">Rescan Social</button>
+          </div>
         </div>
       </div>
 
@@ -718,8 +721,9 @@
         lastScanText.textContent = 'Last scanned: Never';
       }
 
-      // Setup rescan button
-      document.getElementById('rescan-btn').addEventListener('click', scanRepositories);
+      // Setup rescan buttons
+      document.getElementById('rescan-repos-btn').addEventListener('click', rescanRepos);
+      document.getElementById('rescan-social-btn').addEventListener('click', rescanSocial);
     }
 
     async function displayTags(username, viewerUsername) {
@@ -885,6 +889,73 @@
         alert(`Failed to scan more repos: ${error.message}`);
         scanMoreBtn.textContent = originalText;
         scanMoreBtn.disabled = false;
+      }
+    }
+
+    async function rescanRepos() {
+      const rescanReposBtn = document.getElementById('rescan-repos-btn');
+      const originalText = rescanReposBtn.textContent;
+
+      rescanReposBtn.textContent = 'Scanning...';
+      rescanReposBtn.disabled = true;
+
+      try {
+        const scanner = localStorage.getItem('loggedInUser');
+        let scanUrl = `/api/scan?username=${username}`;
+        if (scanner && scanner !== username) {
+          scanUrl += `&scanner=${scanner}`;
+        }
+
+        const response = await fetch(scanUrl);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Scan failed');
+        }
+
+        // Reload the page data to show new repos
+        await loadExistingData();
+
+      } catch (error) {
+        console.error(error);
+        alert(`Failed to rescan repos: ${error.message}`);
+        rescanReposBtn.textContent = originalText;
+        rescanReposBtn.disabled = false;
+      }
+    }
+
+    async function rescanSocial() {
+      const rescanSocialBtn = document.getElementById('rescan-social-btn');
+      const originalText = rescanSocialBtn.textContent;
+
+      rescanSocialBtn.textContent = 'Scanning...';
+      rescanSocialBtn.disabled = true;
+
+      try {
+        const scanner = localStorage.getItem('loggedInUser');
+        let scanUrl = `/api/scan-social?username=${username}`;
+        if (scanner && scanner !== username) {
+          scanUrl += `&scanner=${scanner}`;
+        }
+
+        const response = await fetch(scanUrl);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Scan failed');
+        }
+
+        // Show success message with counts
+        alert(`Social scan complete!\nFollowers: ${data.followers_scanned} scanned (${data.total_followers} total)\nFollowing: ${data.following_scanned} scanned (${data.total_following} total)`);
+
+        // Reload the page data to show updated social connections
+        await loadExistingData();
+
+      } catch (error) {
+        console.error(error);
+        alert(`Failed to rescan social: ${error.message}`);
+        rescanSocialBtn.textContent = originalText;
+        rescanSocialBtn.disabled = false;
       }
     }
 

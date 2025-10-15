@@ -951,6 +951,127 @@ const server = Bun.serve({
       }
     }
 
+    if (url.pathname === "/api/scan-social") {
+      // Rescan only followers and following (no repos)
+      const username = url.searchParams.get("username");
+      const scannerUsername = url.searchParams.get("scanner");
+
+      if (!username) {
+        return new Response(JSON.stringify({ error: "Missing username" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      try {
+        // Get the scanner's access token
+        let accessToken = null;
+        if (scannerUsername) {
+          const scannerStmt = db.prepare("SELECT access_token FROM users WHERE username = ?");
+          const scanner = scannerStmt.get(scannerUsername) as any;
+          if (scanner && scanner.access_token) {
+            accessToken = scanner.access_token;
+          }
+        }
+
+        if (!accessToken) {
+          const userStmt = db.prepare("SELECT access_token FROM users WHERE username = ?");
+          const user = userStmt.get(username) as any;
+          if (user && user.access_token) {
+            accessToken = user.access_token;
+          }
+        }
+
+        if (!accessToken) {
+          return new Response(JSON.stringify({
+            error: "Authentication required"
+          }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Get user
+        const user = db.prepare("SELECT * FROM users WHERE username = ?").get(username) as any;
+        if (!user) {
+          return new Response(JSON.stringify({ error: "User not found" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Fetch followers and following (preserve historical data)
+        const socialInsertStmt = db.prepare(`
+          INSERT INTO social_connections (user_id, github_username, avatar_url, connection_type)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id, github_username, connection_type) DO UPDATE SET
+            avatar_url = excluded.avatar_url,
+            updated_at = CURRENT_TIMESTAMP
+        `);
+
+        // Fetch followers (limit to 100) with authentication
+        const followersResponse = await fetch(
+          `https://api.github.com/users/${username}/followers?per_page=100`,
+          {
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Accept": "application/vnd.github.v3+json"
+            }
+          }
+        );
+
+        let followersAdded = 0;
+        if (followersResponse.ok) {
+          const followers = await followersResponse.json() as Array<{ login: string; avatar_url: string }>;
+          for (const follower of followers) {
+            socialInsertStmt.run(user.id, follower.login, follower.avatar_url, "follower");
+          }
+          followersAdded = followers.length;
+        }
+
+        // Fetch following (limit to 100) with authentication
+        const followingResponse = await fetch(
+          `https://api.github.com/users/${username}/following?per_page=100`,
+          {
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Accept": "application/vnd.github.v3+json"
+            }
+          }
+        );
+
+        let followingAdded = 0;
+        if (followingResponse.ok) {
+          const following = await followingResponse.json() as Array<{ login: string; avatar_url: string }>;
+          for (const person of following) {
+            socialInsertStmt.run(user.id, person.login, person.avatar_url, "following");
+          }
+          followingAdded = following.length;
+        }
+
+        // Get updated counts from database
+        const followersCount = db.prepare("SELECT COUNT(*) as count FROM social_connections WHERE user_id = ? AND connection_type = 'follower'").get(user.id) as any;
+        const followingCount = db.prepare("SELECT COUNT(*) as count FROM social_connections WHERE user_id = ? AND connection_type = 'following'").get(user.id) as any;
+
+        return new Response(JSON.stringify({
+          success: true,
+          followers_scanned: followersAdded,
+          following_scanned: followingAdded,
+          total_followers: followersCount.count,
+          total_following: followingCount.count
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+
+      } catch (error) {
+        console.error("Scan social error:", error);
+        return new Response(JSON.stringify({ error: "Social scan failed" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
     if (url.pathname === "/api/techstack") {
       // Get tech stack for user
       const username = url.searchParams.get("username");
