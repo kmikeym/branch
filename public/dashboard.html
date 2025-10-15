@@ -117,17 +117,35 @@
             </div>
           </div>
 
-          <div class="section" id="followers-section">
-            <h3>👥 Followers (<span id="followers-total">0</span>)</h3>
-            <div id="followers" class="social-grid">
-              <!-- Populated by JS -->
+          <div class="section" id="social-tabs-section">
+            <div class="social-tabs">
+              <button class="social-tab active" data-tab="mutual" onclick="switchSocialTab('mutual')">
+                🤝 Mutual <span id="mutual-count">(0)</span>
+              </button>
+              <button class="social-tab" data-tab="following" onclick="switchSocialTab('following')">
+                ➡️ Following <span id="following-count">(0)</span>
+              </button>
+              <button class="social-tab" data-tab="followers" onclick="switchSocialTab('followers')">
+                👥 Followers <span id="followers-count">(0)</span>
+              </button>
             </div>
-          </div>
 
-          <div class="section" id="following-section">
-            <h3>➡️ Following (<span id="following-total">0</span>)</h3>
-            <div id="following" class="social-grid">
-              <!-- Populated by JS -->
+            <div class="social-tab-content active" id="tab-mutual">
+              <div id="mutual" class="social-grid">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <div class="social-tab-content" id="tab-following">
+              <div id="following" class="social-grid">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <div class="social-tab-content" id="tab-followers">
+              <div id="followers" class="social-grid">
+                <!-- Populated by JS -->
+              </div>
             </div>
           </div>
         </div>
@@ -693,21 +711,42 @@
         contributedToTotal.textContent = '0';
       }
 
+      // Calculate mutual followers
+      const followers = techData.followers || [];
+      const following = techData.following || [];
+      const followersSet = new Set(followers.map(f => f.username));
+      const followingSet = new Set(following.map(f => f.username));
+      const mutualUsers = followers.filter(f => followingSet.has(f.username));
+
+      // Update tab counts
+      const hasMoreFollowers = followers.length >= 100;
+      const hasMoreFollowing = following.length >= 100;
+
+      document.getElementById('mutual-count').textContent = `(${mutualUsers.length})`;
+      document.getElementById('following-count').innerHTML = hasMoreFollowing
+        ? `(${following.length}+) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 4px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`
+        : `(${following.length})`;
+      document.getElementById('followers-count').innerHTML = hasMoreFollowers
+        ? `(${followers.length}+) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 4px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`
+        : `(${followers.length})`;
+
+      // Display mutual followers
+      const mutualContainer = document.getElementById('mutual');
+      if (mutualUsers.length > 0) {
+        mutualContainer.innerHTML = mutualUsers.map(user => `
+          <a href="/dashboard.html?user=${user.username}" class="social-card" title="${user.username}">
+            <img src="${user.avatar_url}" alt="${user.username}" class="${user.user_type || 'unscanned'}">
+            <span>${user.username}</span>
+          </a>
+        `).join('');
+      } else {
+        mutualContainer.innerHTML = '<p class="empty-state">No mutual followers</p>';
+      }
+
       // Display followers
       const followersContainer = document.getElementById('followers');
-      const followersTotal = document.getElementById('followers-total');
-      const followersSection = document.getElementById('followers-section');
-
-      if (techData.followers && techData.followers.length > 0) {
-        const hasMoreFollowers = techData.followers.length >= 100;
-        const followersHeader = followersSection.querySelector('h3');
-        if (hasMoreFollowers) {
-          followersHeader.innerHTML = `👥 Followers (<span id="followers-total">${techData.followers.length}+</span>) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 8px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`;
-        } else {
-          followersHeader.innerHTML = `👥 Followers (<span id="followers-total">${techData.followers.length}</span>)`;
-        }
-
-        followersContainer.innerHTML = techData.followers.map(follower => `
+      if (followers.length > 0) {
+        followersContainer.innerHTML = followers.map(follower => `
           <a href="/dashboard.html?user=${follower.username}" class="social-card" title="${follower.username}">
             <img src="${follower.avatar_url}" alt="${follower.username}" class="${follower.user_type || 'unscanned'}">
             <span>${follower.username}</span>
@@ -719,19 +758,8 @@
 
       // Display following
       const followingContainer = document.getElementById('following');
-      const followingTotal = document.getElementById('following-total');
-      const followingSection = document.getElementById('following-section');
-
-      if (techData.following && techData.following.length > 0) {
-        const hasMoreFollowing = techData.following.length >= 100;
-        const followingHeader = followingSection.querySelector('h3');
-        if (hasMoreFollowing) {
-          followingHeader.innerHTML = `➡️ Following (<span id="following-total">${techData.following.length}+</span>) <span style="display: inline-block; width: 8px; height: 8px; background: #ff3b30; border-radius: 50%; margin-left: 8px; box-shadow: 0 0 8px rgba(255, 59, 48, 0.6);"></span>`;
-        } else {
-          followingHeader.innerHTML = `➡️ Following (<span id="following-total">${techData.following.length}</span>)`;
-        }
-
-        followingContainer.innerHTML = techData.following.map(person => `
+      if (following.length > 0) {
+        followingContainer.innerHTML = following.map(person => `
           <a href="/dashboard.html?user=${person.username}" class="social-card" title="${person.username}">
             <img src="${person.avatar_url}" alt="${person.username}" class="${person.user_type || 'unscanned'}">
             <span>${person.username}</span>
@@ -1102,6 +1130,21 @@
 
     function closeForkModal() {
       document.getElementById('fork-modal').classList.add('hidden');
+    }
+
+    // Tab switching function
+    function switchSocialTab(tabName) {
+      // Remove active class from all tabs and tab contents
+      document.querySelectorAll('.social-tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.querySelectorAll('.social-tab-content').forEach(content => {
+        content.classList.remove('active');
+      });
+
+      // Add active class to selected tab and content
+      document.querySelector(`.social-tab[data-tab="${tabName}"]`).classList.add('active');
+      document.getElementById(`tab-${tabName}`).classList.add('active');
     }
 
     // Close modals when clicking outside of them

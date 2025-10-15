@@ -1126,3 +1126,66 @@ body {
   gap: 12px;
   flex-wrap: wrap;
 }
+
+/* Social Tabs */
+.social-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #f6f8fa;
+}
+
+.social-tab {
+  background: none;
+  border: none;
+  padding: 12px 20px;
+  font-size: 1em;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.social-tab:hover {
+  color: #1a1a1a;
+  background: #fafafa;
+}
+
+.social-tab.active {
+  color: #1a1a1a;
+  border-bottom-color: #1a1a1a;
+}
+
+.social-tab span {
+  font-size: 0.9em;
+  color: #999;
+}
+
+.social-tab.active span {
+  color: #666;
+}
+
+.social-tab-content {
+  display: none;
+  padding-top: 8px;
+}
+
+.social-tab-content.active {
+  display: block;
+}
+
+.tag-blue {
+  background: #dbeafe !important;
+  color: #1e40af !important;
+  border-color: #93c5fd !important;
+}
+
+.tag-blue:hover {
+  background: #bfdbfe !important;
+  border-color: #60a5fa !important;
+}
