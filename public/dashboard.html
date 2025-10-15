@@ -547,16 +547,18 @@
       const profileTwitter = document.getElementById('profile-twitter');
       const profileMemberSince = document.getElementById('profile-member-since');
 
-      // Main heading - use name if available, otherwise username
+      // Main heading - always show name if available
       if (techData.name) {
         profileName.textContent = techData.name;
+        // Username shown in secondary position
+        profileUsername.textContent = `@${techData.username}`;
+        profileUsername.style.display = 'block';
       } else {
-        profileName.textContent = `@${techData.username}`;
+        // If no name, show username as main heading without @
+        profileName.textContent = techData.username;
+        // Hide secondary username line since it's already the main heading
+        profileUsername.style.display = 'none';
       }
-
-      // Username always shown in secondary position
-      profileUsername.textContent = `@${techData.username}`;
-      profileUsername.style.display = 'block';
 
       // Bio
       if (techData.bio) {
