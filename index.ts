@@ -2278,7 +2278,7 @@ const server = Bun.serve({
         `);
         const recentScanned = recentScannedStmt.all() as any[];
 
-        // Popular technologies (top 20)
+        // Popular technologies (top 20) - includes user tags, AI tools, services, and tech stack
         const popularTechStmt = db.prepare(`
           SELECT
             tech as name,
@@ -2286,6 +2286,7 @@ const server = Bun.serve({
             CASE
               WHEN tech IN (SELECT ai_tool FROM ai_assistance) THEN 'blue'
               WHEN tech IN (SELECT service_name FROM services) THEN 'green'
+              WHEN tech IN (SELECT DISTINCT tag FROM tags WHERE tagged_entity_type = 'user') THEN 'blue'
               ELSE 'gray'
             END as color
           FROM (
@@ -2294,6 +2295,8 @@ const server = Bun.serve({
             SELECT ai_tool as tech, COUNT(DISTINCT user_id) as user_count FROM ai_assistance GROUP BY ai_tool
             UNION ALL
             SELECT service_name as tech, COUNT(DISTINCT user_id) as user_count FROM services GROUP BY service_name
+            UNION ALL
+            SELECT tag as tech, COUNT(DISTINCT tagged_entity_id) as user_count FROM tags WHERE tagged_entity_type = 'user' GROUP BY tag
           )
           GROUP BY tech
           ORDER BY user_count DESC
