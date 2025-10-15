@@ -376,19 +376,147 @@
       }
     }
 
-    function showScanInvitation() {
+    async function showScanInvitation() {
+      // Fixes #2: Show friendly skeleton UI instead of error message
       document.getElementById('loading').classList.add('hidden');
-      document.getElementById('error').classList.remove('hidden');
-      document.getElementById('error-message').textContent = `@${username} hasn't been scanned yet.`;
+      document.getElementById('error').classList.add('hidden');
+      document.getElementById('results').classList.remove('hidden');
 
-      const errorDiv = document.getElementById('error');
-      errorDiv.innerHTML = `
-        <p>👋 @${username} hasn't been scanned yet</p>
-        <p id="error-message">Would you like to scan their profile?</p>
-        <button id="scan-user-btn" class="btn-primary" style="margin-top: 20px;">Scan @${username}</button>
+      // Fetch basic user info from GitHub
+      let avatar_url = `https://github.com/${username}.png`;
+      let name = null;
+      let bio = null;
+
+      try {
+        const response = await fetch(`https://api.github.com/users/${username}`);
+        if (response.ok) {
+          const userData = await response.json();
+          avatar_url = userData.avatar_url;
+          name = userData.name;
+          bio = userData.bio;
+        }
+      } catch (error) {
+        console.error('Failed to fetch GitHub user info:', error);
+      }
+
+      // Show profile header with real avatar
+      const profileHeader = document.getElementById('profile-header');
+      const profileAvatar = document.getElementById('profile-avatar');
+      const profileName = document.getElementById('profile-name');
+      const profileUsername = document.getElementById('profile-username');
+      const profileBio = document.getElementById('profile-bio');
+
+      profileAvatar.src = avatar_url;
+      profileAvatar.className = 'profile-avatar unscanned';
+
+      if (name) {
+        profileName.textContent = name;
+      } else {
+        profileName.textContent = `@${username}`;
+      }
+
+      profileUsername.textContent = `@${username}`;
+      profileUsername.style.display = 'block';
+
+      if (bio) {
+        profileBio.textContent = bio;
+        profileBio.style.display = 'block';
+      } else {
+        profileBio.style.display = 'none';
+      }
+
+      document.getElementById('github-profile-link').href = `https://github.com/${username}`;
+      document.getElementById('profile-followers-count').textContent = '? followers';
+      document.getElementById('profile-following-count').textContent = '? following';
+      document.getElementById('repos-count').textContent = '?';
+      document.getElementById('tech-count').textContent = '?';
+
+      profileHeader.classList.remove('hidden');
+
+      // Show skeleton content with scan options
+      const tagsContainer = document.getElementById('tags-container');
+      tagsContainer.innerHTML = '<div style="background: #e0e0e0; height: 24px; width: 80px; border-radius: 12px; animation: pulse 1.5s ease-in-out infinite;"></div>';
+
+      // Show scan invitation in place of social network
+      const socialSection = document.getElementById('social-network');
+      socialSection.innerHTML = `
+        <div style="text-align: center; padding: 48px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
+          <h2 style="margin: 0 0 16px 0; color: white;">Ready to discover @${username}?</h2>
+          <p style="margin: 0 0 32px 0; font-size: 1.1em; opacity: 0.95;">Choose how you'd like to scan this profile</p>
+          <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+            <button id="fast-scan-btn" class="btn-secondary" style="flex: 1; min-width: 200px; max-width: 300px; background: white; color: #667eea; font-weight: 600; border: none;">
+              ⚡ Fast Profile Scan
+              <div style="font-size: 0.85em; font-weight: normal; margin-top: 4px; opacity: 0.8;">Just profile info (quick)</div>
+            </button>
+            <button id="full-scan-btn" class="btn-primary" style="flex: 1; min-width: 200px; max-width: 300px; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); color: white; font-weight: 600; border: 2px solid white;">
+              🚀 Full Repo Scan
+              <div style="font-size: 0.85em; font-weight: normal; margin-top: 4px; opacity: 0.9;">Complete tech stack scan</div>
+            </button>
+          </div>
+        </div>
       `;
 
-      document.getElementById('scan-user-btn').onclick = scanRepositories;
+      // Show skeleton placeholders for other sections
+      document.getElementById('repositories').innerHTML = `
+        <div style="display: grid; gap: 16px;">
+          ${Array(3).fill(0).map(() => `
+            <div style="background: #f5f5f5; height: 80px; border-radius: 8px; animation: pulse 1.5s ease-in-out infinite;"></div>
+          `).join('')}
+        </div>
+      `;
+
+      document.getElementById('all-tech').innerHTML = `
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          ${Array(6).fill(0).map((_, i) => `
+            <div style="background: #e0e0e0; height: 28px; width: ${80 + (i * 20)}px; border-radius: 14px; animation: pulse 1.5s ease-in-out infinite; animation-delay: ${i * 0.1}s;"></div>
+          `).join('')}
+        </div>
+      `;
+
+      // Hide rescan section for unscanned profiles
+      document.querySelector('.rescan-section').style.display = 'none';
+
+      // Setup button handlers
+      document.getElementById('fast-scan-btn').onclick = fastScanProfile;
+      document.getElementById('full-scan-btn').onclick = scanRepositories;
+    }
+
+    async function fastScanProfile() {
+      // Fast scan: only fetch profile data without scanning repos
+      document.getElementById('results').classList.add('hidden');
+      document.getElementById('loading').classList.remove('hidden');
+
+      const loadingDiv = document.getElementById('loading');
+      loadingDiv.innerHTML = `
+        <p>⚡ Quick scanning @${username}'s profile...</p>
+        <p class="loading-subtext">This will only take a moment</p>
+      `;
+
+      try {
+        const scanner = localStorage.getItem('loggedInUser');
+        let scanUrl = `/api/rescan-profile?username=${username}`;
+        if (scanner) {
+          scanUrl += `&scanner=${scanner}`;
+        }
+
+        const response = await fetch(scanUrl);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Fast scan failed');
+        }
+
+        // Reload to show the profile data
+        await loadExistingData();
+
+      } catch (error) {
+        console.error(error);
+        loadingDiv.innerHTML = `
+          <p>🔍 Loading profile...</p>
+          <p class="loading-subtext">This may take a moment</p>
+        `;
+        showError(error.message);
+      }
     }
 
     async function displayResults(scanData, techData) {
