@@ -1766,6 +1766,10 @@ const server = Bun.serve({
         const totalUsersStmt = db.prepare("SELECT COUNT(*) as count FROM users");
         const totalUsers = (totalUsersStmt.get() as any).count;
 
+        // Total authenticated users (logged in with green glow)
+        const authenticatedUsersStmt = db.prepare("SELECT COUNT(*) as count FROM users WHERE access_token IS NOT NULL");
+        const authenticatedUsers = (authenticatedUsersStmt.get() as any).count;
+
         // Total repositories
         const totalReposStmt = db.prepare("SELECT COUNT(*) as count FROM repositories");
         const totalRepos = (totalReposStmt.get() as any).count;
@@ -1782,8 +1786,22 @@ const server = Bun.serve({
         `);
         const totalTech = (totalTechStmt.get() as any).count;
 
-        // Recent users (authenticated or scanned, limit 12)
-        const recentUsersStmt = db.prepare(`
+        // Recent authenticated users (logged in, limit 6)
+        const recentAuthUsersStmt = db.prepare(`
+          SELECT
+            username,
+            avatar_url,
+            'authenticated' as user_type,
+            COALESCE(last_scan, created_at) as activity_date
+          FROM users
+          WHERE access_token IS NOT NULL
+          ORDER BY activity_date DESC
+          LIMIT 6
+        `);
+        const recentAuthUsers = recentAuthUsersStmt.all() as any[];
+
+        // Recent scanned users (all scanned including authenticated, limit 6)
+        const recentScannedStmt = db.prepare(`
           SELECT
             username,
             avatar_url,
@@ -1796,9 +1814,9 @@ const server = Bun.serve({
           FROM users
           WHERE access_token IS NOT NULL OR scanned_by IS NOT NULL
           ORDER BY activity_date DESC
-          LIMIT 12
+          LIMIT 6
         `);
-        const recentUsers = recentUsersStmt.all() as any[];
+        const recentScanned = recentScannedStmt.all() as any[];
 
         // Popular technologies (top 20)
         const popularTechStmt = db.prepare(`
@@ -1825,9 +1843,15 @@ const server = Bun.serve({
 
         return new Response(JSON.stringify({
           total_users: totalUsers,
+          authenticated_users: authenticatedUsers,
           total_repos: totalRepos,
           total_technologies: totalTech,
-          recent_users: recentUsers.map(u => ({
+          recent_auth_users: recentAuthUsers.map(u => ({
+            username: u.username,
+            avatar_url: u.avatar_url,
+            user_type: u.user_type
+          })),
+          recent_scanned: recentScanned.map(u => ({
             username: u.username,
             avatar_url: u.avatar_url,
             user_type: u.user_type

@@ -43,6 +43,10 @@
         <span class="stat-label">Developers</span>
       </div>
       <div class="stat-card">
+        <span class="stat-number" id="authenticated-users">-</span>
+        <span class="stat-label">Users</span>
+      </div>
+      <div class="stat-card">
         <span class="stat-number" id="total-repos">-</span>
         <span class="stat-label">Repositories</span>
       </div>
@@ -52,10 +56,19 @@
       </div>
     </div>
 
-    <div class="landing-section">
-      <h2>Recently Scanned</h2>
-      <div id="recent-users" class="social-grid">
-        <div class="loading-placeholder">Loading...</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 48px;">
+      <div class="landing-section" style="margin-bottom: 0;">
+        <h2>Recent Users</h2>
+        <div id="recent-auth-users" class="social-grid">
+          <div class="loading-placeholder">Loading...</div>
+        </div>
+      </div>
+
+      <div class="landing-section" style="margin-bottom: 0;">
+        <h2>Recently Scanned</h2>
+        <div id="recent-scanned" class="social-grid">
+          <div class="loading-placeholder">Loading...</div>
+        </div>
       </div>
     </div>
 
@@ -162,20 +175,34 @@
 
         if (response.ok) {
           document.getElementById('total-users').textContent = data.total_users;
+          document.getElementById('authenticated-users').textContent = data.authenticated_users;
           document.getElementById('total-repos').textContent = data.total_repos;
           document.getElementById('total-tech').textContent = data.total_technologies;
 
-          // Display recent users
-          const recentUsersContainer = document.getElementById('recent-users');
-          if (data.recent_users && data.recent_users.length > 0) {
-            recentUsersContainer.innerHTML = data.recent_users.map(user => `
+          // Display recent authenticated users
+          const recentAuthUsersContainer = document.getElementById('recent-auth-users');
+          if (data.recent_auth_users && data.recent_auth_users.length > 0) {
+            recentAuthUsersContainer.innerHTML = data.recent_auth_users.map(user => `
               <a href="/dashboard.html?user=${user.username}" class="social-card" title="${user.username}">
                 <img src="${user.avatar_url}" alt="${user.username}" class="${user.user_type || 'unscanned'}">
                 <span>${user.username}</span>
               </a>
             `).join('');
           } else {
-            recentUsersContainer.innerHTML = '<p class="empty-state">No users yet. Be the first!</p>';
+            recentAuthUsersContainer.innerHTML = '<p class="empty-state">No users yet. Be the first!</p>';
+          }
+
+          // Display recently scanned
+          const recentScannedContainer = document.getElementById('recent-scanned');
+          if (data.recent_scanned && data.recent_scanned.length > 0) {
+            recentScannedContainer.innerHTML = data.recent_scanned.map(user => `
+              <a href="/dashboard.html?user=${user.username}" class="social-card" title="${user.username}">
+                <img src="${user.avatar_url}" alt="${user.username}" class="${user.user_type || 'unscanned'}">
+                <span>${user.username}</span>
+              </a>
+            `).join('');
+          } else {
+            recentScannedContainer.innerHTML = '<p class="empty-state">No scans yet</p>';
           }
 
           // Display popular technologies
