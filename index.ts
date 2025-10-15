@@ -147,6 +147,20 @@ db.run(`
   )
 `);
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS contributors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_owner TEXT NOT NULL,
+    repo_name TEXT NOT NULL,
+    contributor_username TEXT NOT NULL,
+    contributor_user_id INTEGER,
+    contributions INTEGER DEFAULT 0,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (contributor_user_id) REFERENCES users(id),
+    UNIQUE(repo_owner, repo_name, contributor_username)
+  )
+`);
+
 console.log("✅ Database initialized");
 
 // Server configuration
@@ -447,6 +461,51 @@ const server = Bun.serve({
               username,
               user.id
             );
+          }
+        }
+
+        // Fetch contributors for each repository (limit to top 10 per repo to avoid API limits)
+        const contributorInsertStmt = db.prepare(`
+          INSERT INTO contributors (repo_owner, repo_name, contributor_username, contributions)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(repo_owner, repo_name, contributor_username) DO UPDATE SET
+            contributions = excluded.contributions,
+            updated_at = CURRENT_TIMESTAMP
+        `);
+
+        for (const repo of repos) {
+          try {
+            const contributorsResponse = await fetch(
+              `https://api.github.com/repos/${username}/${repo.name}/contributors?per_page=10`,
+              {
+                headers: {
+                  "Authorization": `Bearer ${accessToken}`,
+                  "Accept": "application/vnd.github.v3+json"
+                }
+              }
+            );
+
+            if (contributorsResponse.ok) {
+              const contributors = await contributorsResponse.json() as Array<{
+                login: string;
+                contributions: number;
+              }>;
+
+              for (const contributor of contributors) {
+                // Only store contributors other than the repo owner
+                if (contributor.login !== username) {
+                  contributorInsertStmt.run(
+                    username,
+                    repo.name,
+                    contributor.login,
+                    contributor.contributions
+                  );
+                }
+              }
+            }
+          } catch (error) {
+            // Skip repos with contributor access issues
+            continue;
           }
         }
 
@@ -1044,6 +1103,46 @@ const server = Bun.serve({
 
       const forkedBy = forkedByStmt.all(username) as any[];
 
+      // Get contributors to this user's repos
+      const contributorsStmt = db.prepare(`
+        SELECT DISTINCT
+          c.contributor_username,
+          c.repo_name,
+          c.contributions,
+          u.avatar_url,
+          CASE
+            WHEN u.access_token IS NOT NULL THEN 'authenticated'
+            WHEN u.scanned_by IS NOT NULL THEN 'scanned'
+            ELSE 'unscanned'
+          END as user_type
+        FROM contributors c
+        LEFT JOIN users u ON u.username = c.contributor_username
+        WHERE c.repo_owner = ?
+        ORDER BY c.contributions DESC, c.contributor_username ASC
+      `);
+
+      const contributorsToRepos = contributorsStmt.all(username) as any[];
+
+      // Get repos this user has contributed to (owned by others)
+      const contributedToStmt = db.prepare(`
+        SELECT DISTINCT
+          c.repo_owner,
+          c.repo_name,
+          c.contributions,
+          u.avatar_url as owner_avatar,
+          CASE
+            WHEN u.access_token IS NOT NULL THEN 'authenticated'
+            WHEN u.scanned_by IS NOT NULL THEN 'scanned'
+            ELSE 'unscanned'
+          END as owner_user_type
+        FROM contributors c
+        LEFT JOIN users u ON u.username = c.repo_owner
+        WHERE c.contributor_username = ?
+        ORDER BY c.contributions DESC, c.repo_owner ASC, c.repo_name ASC
+      `);
+
+      const contributedTo = contributedToStmt.all(username) as any[];
+
       return new Response(JSON.stringify({
         username: userData.username,
         avatar_url: userData.avatar_url,
@@ -1075,6 +1174,20 @@ const server = Bun.serve({
           repo_name: f.repo_name,
           avatar_url: f.avatar_url,
           user_type: f.user_type
+        })),
+        contributors: contributorsToRepos.map((c: any) => ({
+          username: c.contributor_username,
+          repo_name: c.repo_name,
+          contributions: c.contributions,
+          avatar_url: c.avatar_url,
+          user_type: c.user_type
+        })),
+        contributed_to: contributedTo.map((c: any) => ({
+          repo_owner: c.repo_owner,
+          repo_name: c.repo_name,
+          contributions: c.contributions,
+          owner_avatar: c.owner_avatar,
+          owner_user_type: c.owner_user_type
         })),
         repositories: reposResults.map((r: any) => ({
           name: r.name,

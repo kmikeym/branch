@@ -102,6 +102,20 @@
             </div>
           </div>
 
+          <div class="section" id="contributors-section">
+            <h3>👨‍💻 Contributors to Your Repos (<span id="contributors-total">0</span>)</h3>
+            <div id="contributors" class="fork-connections">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div class="section" id="contributed-to-section">
+            <h3>🤝 You Contributed To (<span id="contributed-to-total">0</span>)</h3>
+            <div id="contributed-to" class="fork-connections">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
           <div class="section" id="followers-section">
             <h3>👥 Followers (<span id="followers-total">0</span>)</h3>
             <div id="followers" class="social-grid">
@@ -556,6 +570,88 @@
         `).join('');
       } else {
         forkedByContainer.innerHTML = '<p class="empty-state">No forks</p>';
+      }
+
+      // Display contributors to this user's repos
+      const contributorsContainer = document.getElementById('contributors');
+      const contributorsTotal = document.getElementById('contributors-total');
+
+      if (techData.contributors && techData.contributors.length > 0) {
+        // Group by contributor
+        const uniqueContributors = {};
+        techData.contributors.forEach(contrib => {
+          if (!uniqueContributors[contrib.username]) {
+            uniqueContributors[contrib.username] = {
+              username: contrib.username,
+              avatar_url: contrib.avatar_url,
+              user_type: contrib.user_type,
+              repos: [],
+              total_contributions: 0
+            };
+          }
+          uniqueContributors[contrib.username].repos.push(contrib.repo_name);
+          uniqueContributors[contrib.username].total_contributions += contrib.contributions;
+        });
+
+        const contributorsArray = Object.values(uniqueContributors);
+        contributorsTotal.textContent = contributorsArray.length;
+
+        contributorsContainer.innerHTML = contributorsArray.map(contributor => `
+          <div class="fork-connection-item">
+            <a href="/dashboard.html?user=${contributor.username}" class="fork-connection-user">
+              <img src="${contributor.avatar_url || `https://github.com/${contributor.username}.png`}" alt="${contributor.username}" class="${contributor.user_type || 'unscanned'}">
+              <span>${contributor.username}</span>
+              <span style="font-size: 0.8em; color: #666; margin-left: 8px;">${contributor.total_contributions} contribution${contributor.total_contributions !== 1 ? 's' : ''}</span>
+            </a>
+            <div class="fork-connection-repos">
+              ${contributor.repos.map(repo => `<span class="fork-repo-tag">${repo}</span>`).join('')}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        contributorsContainer.innerHTML = '<p class="empty-state">No contributors yet</p>';
+        contributorsTotal.textContent = '0';
+      }
+
+      // Display repos this user contributed to
+      const contributedToContainer = document.getElementById('contributed-to');
+      const contributedToTotal = document.getElementById('contributed-to-total');
+
+      if (techData.contributed_to && techData.contributed_to.length > 0) {
+        // Group by owner
+        const groupedContributions = {};
+        techData.contributed_to.forEach(contrib => {
+          if (!groupedContributions[contrib.repo_owner]) {
+            groupedContributions[contrib.repo_owner] = {
+              owner: contrib.repo_owner,
+              owner_avatar: contrib.owner_avatar,
+              owner_user_type: contrib.owner_user_type,
+              repos: [],
+              total_contributions: 0
+            };
+          }
+          groupedContributions[contrib.repo_owner].repos.push(contrib.repo_name);
+          groupedContributions[contrib.repo_owner].total_contributions += contrib.contributions;
+        });
+
+        const contributionsArray = Object.values(groupedContributions);
+        contributedToTotal.textContent = contributionsArray.length;
+
+        contributedToContainer.innerHTML = contributionsArray.map(group => `
+          <div class="fork-connection-item">
+            <a href="/dashboard.html?user=${group.owner}" class="fork-connection-user">
+              <img src="${group.owner_avatar || `https://github.com/${group.owner}.png`}" alt="${group.owner}" class="${group.owner_user_type || 'unscanned'}">
+              <span>${group.owner}</span>
+              <span style="font-size: 0.8em; color: #666; margin-left: 8px;">${group.total_contributions} contribution${group.total_contributions !== 1 ? 's' : ''}</span>
+            </a>
+            <div class="fork-connection-repos">
+              ${group.repos.map(repo => `<span class="fork-repo-tag">${repo}</span>`).join('')}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        contributedToContainer.innerHTML = '<p class="empty-state">No contributions to other repos</p>';
+        contributedToTotal.textContent = '0';
       }
 
       // Display followers
