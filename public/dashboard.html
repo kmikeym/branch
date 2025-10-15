@@ -839,20 +839,20 @@
 
         if (data.tags && data.tags.length > 0) {
           tagsContainer.innerHTML = data.tags.map(tagData => {
-            const isOwnTag = tagData.is_own_tag;
             const isViewerTag = tagData.tagged_by.some(t => t.is_viewer);
+            const isOnViewerProfile = tagData.is_on_viewer_profile;
 
-            // Blue for viewer's own tags, green for profile owner's tags, grey for others
+            // Color logic:
+            // - Green: Tags YOU (the viewer) created on this profile
+            // - Blue: Tags that exist on BOTH this profile AND your profile (matching tags)
+            // - Grey: Tags created by others (not you, not a match)
             let colorClass = 'tag-grey';
-            if (isViewerTag && username === viewerUsername) {
-              // Viewing own profile and tagged yourself = green
+            if (isViewerTag) {
+              // You created this tag on this profile = green
               colorClass = 'tag-green';
-            } else if (isViewerTag) {
-              // You tagged someone else = blue
+            } else if (isOnViewerProfile) {
+              // This tag exists on both profiles = blue (matching tag)
               colorClass = 'tag-blue';
-            } else if (isOwnTag) {
-              // Profile owner tagged themselves = green
-              colorClass = 'tag-green';
             }
 
             const canRemove = isViewerTag;

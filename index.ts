@@ -1488,10 +1488,24 @@ const server = Bun.serve({
           });
         });
 
+        // Check if viewer has each tag on their own profile
+        const viewerTagsSet = new Set<string>();
+        if (viewerUsername && viewerUsername !== username) {
+          const viewerTagsStmt = db.prepare(`
+            SELECT DISTINCT tag
+            FROM tags
+            WHERE tagged_entity_type = 'user'
+              AND tagged_entity_id = (SELECT id FROM users WHERE username = ?)
+          `);
+          const viewerTags = viewerTagsStmt.all(viewerUsername) as any[];
+          viewerTags.forEach(vt => viewerTagsSet.add(vt.tag));
+        }
+
         const result = Array.from(tagMap.entries()).map(([tag, taggedBy]) => ({
           tag,
           tagged_by: taggedBy,
-          is_own_tag: taggedBy.some(t => t.is_viewer)
+          is_own_tag: taggedBy.some(t => t.tagged_by_username === username),
+          is_on_viewer_profile: viewerTagsSet.has(tag)
         }));
 
         return new Response(JSON.stringify({
