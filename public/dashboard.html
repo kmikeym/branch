@@ -236,7 +236,10 @@
       </div>
       <div class="modal-body">
         <div style="margin-bottom: 20px;">
-          <input type="text" id="new-tag-input" placeholder="Enter a tag..." style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ddd; border-radius: 6px;">
+          <input type="text" id="new-tag-input" list="tag-suggestions" placeholder="Enter a tag..." style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ddd; border-radius: 6px;">
+          <datalist id="tag-suggestions">
+            <!-- Populated by JS -->
+          </datalist>
           <button id="add-new-tag-btn" class="btn-primary" style="margin-top: 10px; width: 100%;">Add Tag</button>
         </div>
         <div id="all-tags-list" class="tech-tags" style="max-height: 300px; overflow-y: auto;">
@@ -980,14 +983,35 @@
       }
     }
 
+    async function loadTagAutocomplete() {
+      // Fetch all existing tags for autocomplete (Fixes #1)
+      try {
+        const response = await fetch('/api/all-tags');
+        const data = await response.json();
+
+        const datalist = document.getElementById('tag-suggestions');
+        if (data.tags && data.tags.length > 0) {
+          datalist.innerHTML = data.tags.map(tag =>
+            `<option value="${tag}">${tag}</option>`
+          ).join('');
+        } else {
+          datalist.innerHTML = '';
+        }
+      } catch (error) {
+        console.error('Failed to load tag autocomplete:', error);
+      }
+    }
+
     function setupTagsModal(username, loggedInUser) {
       const addTagBtn = document.getElementById('add-tag-btn');
       const tagsModal = document.getElementById('tags-modal');
       const addNewTagBtn = document.getElementById('add-new-tag-btn');
       const newTagInput = document.getElementById('new-tag-input');
 
-      addTagBtn.onclick = () => {
+      addTagBtn.onclick = async () => {
         tagsModal.classList.remove('hidden');
+        // Load all tags for autocomplete (Fixes #1)
+        await loadTagAutocomplete();
       };
 
       addNewTagBtn.onclick = async () => {

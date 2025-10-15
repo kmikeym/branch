@@ -1707,6 +1707,34 @@ const server = Bun.serve({
       }
     }
 
+    if (url.pathname === "/api/all-tags") {
+      // Get all unique tags in the system for autocomplete
+      // Fixes #1: Tags Should Autocomplete
+      try {
+        const stmt = db.prepare(`
+          SELECT DISTINCT tag, COUNT(*) as usage_count
+          FROM tags
+          WHERE tagged_entity_type = 'user'
+          GROUP BY tag
+          ORDER BY usage_count DESC, tag ASC
+        `);
+
+        const tags = stmt.all() as Array<{ tag: string; usage_count: number }>;
+
+        return new Response(JSON.stringify({
+          tags: tags.map(t => t.tag)
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("All tags query error:", error);
+        return new Response(JSON.stringify({ error: "Failed to fetch tags" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
     if (url.pathname === "/api/add-tag" && req.method === "POST") {
       // Add a tag to a user
       try {
