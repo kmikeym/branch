@@ -724,9 +724,12 @@
           const hasAIStackTech = repoTech.some(tech => aiStackTags.includes(tech));
 
           return `
-          <div class="repo-item" style="${hasAIStackTech ? 'border-left: 3px solid #15803d;' : ''}">
+          <div class="repo-item" style="${hasAIStackTech ? 'border-left: 4px solid #15803d; background: linear-gradient(to right, rgba(21, 128, 61, 0.05), transparent 50%);' : ''}">
             <div class="repo-header">
-              <a href="#" class="repo-name" data-repo-index="${index}" onclick="openForkModal(event, ${index})">${repo.name}</a>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <a href="#" class="repo-name" data-repo-index="${index}" onclick="openForkModal(event, ${index})">${repo.name}</a>
+                ${hasAIStackTech ? '<span style="background: #15803d; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.7em; font-weight: 600; letter-spacing: 0.5px;">VIBE CODED</span>' : ''}
+              </div>
               <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
                 ${repo.stars > 0 ? `<span class="repo-stars">⭐ ${repo.stars}</span>` : '<span></span>'}
                 <a href="${repo.url}" target="_blank" class="github-icon-link" title="View on GitHub" onclick="event.stopPropagation()" style="padding: 2px;">
