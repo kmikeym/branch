@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Branch - Build more fast together</title>
+  <title>Branch - Mapping the creative network of code</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -78,16 +78,9 @@
     </div>
 
     <div class="landing-section" id="vibe-coding-section">
-      <h2>🎨 Vibe Coding</h2>
-      <p style="color: #666; margin-bottom: 20px;">Developers building with AI assistance</p>
-      <div id="vibe-coding-tech" class="tech-tags">
-        <div class="loading-placeholder">Loading...</div>
-      </div>
-    </div>
-
-    <div class="landing-section">
-      <h2>Popular Technologies</h2>
-      <div id="popular-tech" class="tech-tags">
+      <h2>The AI Stack</h2>
+      <p style="color: #666; margin-bottom: 20px;">What's powering creative coding right now</p>
+      <div id="ai-stack-tech" class="tech-tags ai-stack-tags">
         <div class="loading-placeholder">Loading...</div>
       </div>
     </div>
@@ -218,38 +211,47 @@
             recentScannedContainer.innerHTML = '<p class="empty-state">No scans yet</p>';
           }
 
-          // Filter vibe coding technologies (AI-related tools and tags)
-          const vibeCodingTools = ['Claude', 'Claude Code', 'ChatGPT', 'GitHub Copilot', 'Cursor', 'AI Assisted', 'Vibe Coder'];
-          const vibeCodingTech = data.popular_tech.filter(tech =>
-            vibeCodingTools.includes(tech.name)
+          // Define AI Stack technologies (creative coding tools and AI-related)
+          const aiStackTools = [
+            'Claude', 'Claude Code', 'ChatGPT', 'GitHub Copilot', 'Cursor', 'Windsurf',
+            'Bun', 'Supabase', 'Next.js', 'Stable Diffusion', 'Processing', 'Three.js',
+            'TouchDesigner', 'Replicate', 'Fireproof', 'Cloudflare Workers',
+            'AI Assisted', 'Vibe Coder', 'React', 'TypeScript', 'Vercel', 'Tailwind CSS'
+          ];
+
+          const aiStackTech = data.popular_tech.filter(tech =>
+            aiStackTools.includes(tech.name)
           );
 
-          // Display vibe coding technologies
-          const vibeCodingContainer = document.getElementById('vibe-coding-tech');
-          if (vibeCodingTech && vibeCodingTech.length > 0) {
-            vibeCodingContainer.innerHTML = vibeCodingTech.map(tech => `
-              <a href="/tech.html?tag=${encodeURIComponent(tech.name)}" class="tech-tag tech-tag-${tech.color}">
-                ${tech.name} <span class="tech-tag-count">${tech.user_count}</span>
-              </a>
-            `).join('');
-          } else {
-            vibeCodingContainer.innerHTML = '<p class="empty-state">No vibe coders yet. Be the first!</p>';
-          }
+          // Calculate size classes based on user count
+          const maxCount = Math.max(...aiStackTech.map(t => t.user_count));
+          const minCount = Math.min(...aiStackTech.map(t => t.user_count));
 
-          // Display popular technologies (excluding vibe coding tools to avoid duplication)
-          const nonVibeTech = data.popular_tech.filter(tech =>
-            !vibeCodingTools.includes(tech.name)
-          );
+          const getSizeClass = (count) => {
+            const range = maxCount - minCount;
+            if (range === 0) return 'tech-tag-medium';
+            const normalized = (count - minCount) / range;
+            if (normalized > 0.66) return 'tech-tag-large';
+            if (normalized > 0.33) return 'tech-tag-medium';
+            return 'tech-tag-small';
+          };
 
-          const popularTechContainer = document.getElementById('popular-tech');
-          if (nonVibeTech && nonVibeTech.length > 0) {
-            popularTechContainer.innerHTML = nonVibeTech.map(tech => `
-              <a href="/tech.html?tag=${encodeURIComponent(tech.name)}" class="tech-tag tech-tag-${tech.color}">
-                ${tech.name} <span class="tech-tag-count">${tech.user_count}</span>
-              </a>
-            `).join('');
+          // Display AI Stack technologies with dynamic sizing
+          const aiStackContainer = document.getElementById('ai-stack-tech');
+          if (aiStackTech && aiStackTech.length > 0) {
+            aiStackContainer.innerHTML = aiStackTech.map(tech => {
+              const sizeClass = getSizeClass(tech.user_count);
+              const isAITool = ['Claude', 'Claude Code', 'ChatGPT', 'GitHub Copilot', 'Cursor', 'Windsurf', 'AI Assisted', 'Vibe Coder'].includes(tech.name);
+              return `
+                <a href="/tech.html?tag=${encodeURIComponent(tech.name)}"
+                   class="tech-tag tech-tag-${tech.color} ${sizeClass} ${isAITool ? 'ai-tool-tag' : ''}"
+                   data-count="${tech.user_count}">
+                  ${tech.name} <span class="tech-tag-count">${tech.user_count}</span>
+                </a>
+              `;
+            }).join('');
           } else {
-            popularTechContainer.innerHTML = '<p class="empty-state">No technologies yet</p>';
+            aiStackContainer.innerHTML = '<p class="empty-state">No technologies yet. Be the first!</p>';
           }
         }
       } catch (error) {

@@ -1286,3 +1286,57 @@ body {
     opacity: 0.4;
   }
 }
+
+/* AI Stack - Dynamic Sizing */
+.ai-stack-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.tech-tag-small {
+  font-size: 0.85em;
+  padding: 6px 12px;
+}
+
+.tech-tag-medium {
+  font-size: 0.95em;
+  padding: 8px 16px;
+}
+
+.tech-tag-large {
+  font-size: 1.1em;
+  padding: 10px 20px;
+  font-weight: 600;
+}
+
+/* AI Tool Tags - Animated Glow */
+.ai-tool-tag {
+  position: relative;
+  animation: subtleGlow 3s ease-in-out infinite;
+}
+
+@keyframes subtleGlow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.5);
+  }
+}
+
+.ai-tool-tag:hover {
+  animation: brightGlow 1.5s ease-in-out infinite;
+  transform: translateY(-2px);
+}
+
+@keyframes brightGlow {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(59, 130, 246, 0.8);
+  }
+}
