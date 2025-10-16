@@ -187,7 +187,148 @@ db.run(`
   )
 `);
 
+// NEW UNIFIED TAG SYSTEM
+db.run(`
+  CREATE TABLE IF NOT EXISTS tags_unified (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    -- The tag itself
+    tag_name TEXT NOT NULL,
+
+    -- What is being tagged
+    entity_type TEXT NOT NULL,  -- 'user' or 'repo'
+    entity_id INTEGER NOT NULL, -- ALWAYS user.id (for repos, identifies owner)
+
+    -- Who/what created this tag
+    source_type TEXT NOT NULL,  -- 'user' or 'system'
+    source_user_id INTEGER,     -- NULL if system-generated
+
+    -- Tag categorization
+    category TEXT NOT NULL,     -- 'language', 'framework', 'ai_tool', 'service', 'user_tag'
+
+    -- For repo tags, which repo name
+    repo_name TEXT,             -- NULL for user-level tags
+
+    -- Metadata
+    confidence REAL DEFAULT 1.0, -- 1.0 for user tags, 0.0-1.0 for auto-detected
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (source_user_id) REFERENCES users(id)
+  )
+`);
+
+// Create separate unique indexes for user and repo tags
+// For user tags: unique on (tag_name, entity_type, entity_id) WHERE repo_name IS NULL
+// For repo tags: unique on (tag_name, entity_type, entity_id, repo_name) WHERE repo_name IS NOT NULL
+db.run(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_user_tags_unique
+  ON tags_unified(tag_name, entity_type, entity_id)
+  WHERE repo_name IS NULL
+`);
+
+db.run(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_repo_tags_unique
+  ON tags_unified(tag_name, entity_type, entity_id, repo_name)
+  WHERE repo_name IS NOT NULL
+`);
+
 console.log("✅ Database initialized");
+
+// MIGRATION: Populate tags_unified from existing tables
+function migrateToUnifiedTags() {
+  console.log("🔄 Starting tag migration...");
+
+  // Check if migration already happened
+  const checkStmt = db.prepare("SELECT COUNT(*) as count FROM tags_unified");
+  const existing = checkStmt.get() as any;
+  if (existing.count > 0) {
+    console.log("✅ Tags already migrated, skipping");
+    return;
+  }
+
+  // 1. Migrate tech_stack (languages/frameworks) to user-level tags
+  console.log("  Migrating tech_stack...");
+  const techStmt = db.prepare(`
+    INSERT INTO tags_unified (tag_name, entity_type, entity_id, source_type, category, confidence)
+    SELECT
+      technology,
+      'user',
+      user_id,
+      'system',
+      category,
+      1.0
+    FROM tech_stack
+  `);
+  techStmt.run();
+
+  // 2. Migrate ai_assistance (AI tools) to repo-level tags
+  console.log("  Migrating ai_assistance...");
+  const aiStmt = db.prepare(`
+    INSERT INTO tags_unified (tag_name, entity_type, entity_id, source_type, category, repo_name, confidence)
+    SELECT DISTINCT
+      ai_tool,
+      'repo',
+      user_id,
+      'system',
+      'ai_tool',
+      repo_name,
+      1.0
+    FROM ai_assistance
+  `);
+  aiStmt.run();
+
+  // Also create user-level AI tool tags (aggregated from their repos)
+  console.log("  Creating user-level AI tool tags...");
+  const userAiStmt = db.prepare(`
+    INSERT OR IGNORE INTO tags_unified (tag_name, entity_type, entity_id, source_type, category, confidence)
+    SELECT DISTINCT
+      ai_tool,
+      'user',
+      user_id,
+      'system',
+      'ai_tool',
+      1.0
+    FROM ai_assistance
+  `);
+  userAiStmt.run();
+
+  // 3. Migrate services to user-level tags
+  console.log("  Migrating services...");
+  const servicesStmt = db.prepare(`
+    INSERT INTO tags_unified (tag_name, entity_type, entity_id, source_type, category, confidence)
+    SELECT
+      service_name,
+      'user',
+      user_id,
+      'system',
+      'service',
+      1.0
+    FROM services
+  `);
+  servicesStmt.run();
+
+  // 4. Migrate existing user tags
+  console.log("  Migrating user tags...");
+  const userTagsStmt = db.prepare(`
+    INSERT INTO tags_unified (tag_name, entity_type, entity_id, source_type, source_user_id, category, confidence)
+    SELECT
+      tag,
+      tagged_entity_type,
+      tagged_entity_id,
+      'user',
+      tagged_by_user_id,
+      'user_tag',
+      1.0
+    FROM tags
+  `);
+  userTagsStmt.run();
+
+  const finalCount = db.prepare("SELECT COUNT(*) as count FROM tags_unified").get() as any;
+  console.log(`✅ Migration complete! ${finalCount.count} tags migrated`);
+}
+
+// Run migration
+migrateToUnifiedTags();
 
 // Server configuration
 const PORT = process.env.PORT || 3000;
@@ -488,8 +629,17 @@ const server = Bun.serve({
             updated_at = CURRENT_TIMESTAMP
         `);
 
+        // Also insert into unified tag system
+        const unifiedTagStmt = db.prepare(`
+          INSERT OR IGNORE INTO tags_unified (tag_name, entity_type, entity_id, source_type, category, confidence)
+          VALUES (?, 'user', ?, 'system', ?, 1.0)
+        `);
+
         for (const [tech, data] of techCount.entries()) {
           insertStmt.run(user.id, tech, data.category, data.count);
+          // Map category to unified system categories
+          const unifiedCategory = data.category === 'language' ? 'language' : 'framework';
+          unifiedTagStmt.run(tech, user.id, unifiedCategory);
         }
 
         // Update repositories (preserve historical data, update existing)
@@ -625,6 +775,12 @@ const server = Bun.serve({
             updated_at = CURRENT_TIMESTAMP
         `);
 
+        // Also insert AI tools into unified tag system (repo-level tags)
+        const aiUnifiedTagStmt = db.prepare(`
+          INSERT OR IGNORE INTO tags_unified (tag_name, entity_type, entity_id, source_type, category, repo_name, confidence)
+          VALUES (?, 'repo', ?, 'system', 'ai_tool', ?, 1.0)
+        `);
+
         const serviceCountMap = new Map<string, { repos: Set<string>; mentions: number }>();
 
         // Scan each repo's README
@@ -651,6 +807,8 @@ const server = Bun.serve({
                 const matches = readmeContentLower.match(pattern);
                 if (matches && matches.length > 0) {
                   aiInsertStmt.run(user.id, repo.name, toolName, matches.length, "README");
+                  // Also write to unified tags (repo-level)
+                  aiUnifiedTagStmt.run(toolName, user.id, repo.name);
                 }
               }
 
@@ -687,8 +845,16 @@ const server = Bun.serve({
             updated_at = CURRENT_TIMESTAMP
         `);
 
+        // Also insert services into unified tag system (user-level tags)
+        const serviceUnifiedTagStmt = db.prepare(`
+          INSERT OR IGNORE INTO tags_unified (tag_name, entity_type, entity_id, source_type, category, confidence)
+          VALUES (?, 'user', ?, 'system', 'service', 1.0)
+        `);
+
         for (const [serviceName, data] of serviceCountMap.entries()) {
           servicesInsertStmt.run(user.id, serviceName, data.repos.size, data.mentions);
+          // Also write to unified tags (user-level)
+          serviceUnifiedTagStmt.run(serviceName, user.id);
         }
 
         // Fetch followers and following (preserve historical data)
@@ -744,9 +910,9 @@ const server = Bun.serve({
         // Auto-tag as "Vibe Coder" if AI tools were detected
         try {
           const aiToolsDetected = db.prepare(`
-            SELECT COUNT(DISTINCT ai_tool) as count
-            FROM ai_assistance
-            WHERE user_id = ?
+            SELECT COUNT(DISTINCT tag_name) as count
+            FROM tags_unified
+            WHERE entity_id = ? AND category = 'ai_tool'
           `).get(user.id) as any;
 
           if (aiToolsDetected.count > 0) {
@@ -1326,49 +1492,53 @@ const server = Bun.serve({
         userType = 'scanned'; // Yellow glow - scanned by someone else
       }
 
-      // Get tech stack
-      const techStmt = db.prepare(`
-        SELECT t.technology, t.category, t.repo_count
-        FROM tech_stack t
-        JOIN users u ON t.user_id = u.id
-        WHERE u.username = ?
-        ORDER BY t.repo_count DESC
+      // Get all tags for this user from unified tag system
+      const userTagsStmt = db.prepare(`
+        SELECT
+          tag_name,
+          category,
+          COUNT(DISTINCT CASE WHEN repo_name IS NOT NULL THEN repo_name ELSE NULL END) as repo_count,
+          GROUP_CONCAT(DISTINCT repo_name) as repos
+        FROM tags_unified
+        WHERE entity_type = 'user' AND entity_id = (SELECT id FROM users WHERE username = ?)
+        GROUP BY tag_name, category
+        ORDER BY repo_count DESC, tag_name ASC
       `);
 
-      const techResults = techStmt.all(username) as any[];
+      const allUserTags = userTagsStmt.all(username) as any[];
 
-      // Get AI assistance data with repo lists
-      const aiStmt = db.prepare(`
-        SELECT ai_tool, COUNT(DISTINCT repo_name) as repo_count, SUM(mention_count) as total_mentions,
-               GROUP_CONCAT(DISTINCT repo_name) as repos
-        FROM ai_assistance
-        WHERE user_id = (SELECT id FROM users WHERE username = ?)
-        GROUP BY ai_tool
-        ORDER BY repo_count DESC, total_mentions DESC
-      `);
+      // Split into categories for backward compatibility with existing frontend
+      const techResults = allUserTags
+        .filter(t => t.category === 'language' || t.category === 'framework')
+        .map(t => ({
+          technology: t.tag_name,
+          category: t.category,
+          repo_count: t.repo_count || 0
+        }));
 
-      const aiResults = aiStmt.all(username) as any[];
-      // Split comma-separated repos into arrays
-      aiResults.forEach(ai => {
-        ai.repos = ai.repos ? ai.repos.split(',') : [];
-      });
+      const aiResults = allUserTags
+        .filter(t => t.category === 'ai_tool')
+        .map(t => ({
+          ai_tool: t.tag_name,
+          repo_count: t.repo_count || 0,
+          total_mentions: t.repo_count || 0,
+          repos: t.repos ? t.repos.split(',') : []
+        }));
 
-      // Get services data
-      const servicesStmt = db.prepare(`
-        SELECT service_name, repo_count, mention_count
-        FROM services
-        WHERE user_id = (SELECT id FROM users WHERE username = ?)
-        ORDER BY repo_count DESC, mention_count DESC
-      `);
+      const servicesResults = allUserTags
+        .filter(t => t.category === 'service')
+        .map(t => ({
+          service_name: t.tag_name,
+          repo_count: t.repo_count || 0,
+          mention_count: t.repo_count || 0
+        }));
 
-      const servicesResults = servicesStmt.all(username) as any[];
-
-      // Get repositories with their AI assistance tools
+      // Get repositories with their tags from unified system
       const reposStmt = db.prepare(`
         SELECT r.name, r.description, r.language, r.stars, r.url,
-               GROUP_CONCAT(DISTINCT a.ai_tool) as ai_tools
+               GROUP_CONCAT(DISTINCT CASE WHEN t.category = 'ai_tool' THEN t.tag_name END) as ai_tools
         FROM repositories r
-        LEFT JOIN ai_assistance a ON a.repo_name = r.name AND a.user_id = r.user_id
+        LEFT JOIN tags_unified t ON t.entity_type = 'repo' AND t.repo_name = r.name AND t.entity_id = r.user_id
         WHERE r.user_id = (SELECT id FROM users WHERE username = ?)
         GROUP BY r.name
         ORDER BY r.stars DESC, r.name ASC
@@ -1686,7 +1856,7 @@ const server = Bun.serve({
     }
 
     if (url.pathname === "/api/tags") {
-      // Get all tags for a user (with tagged_by info to show green vs grey)
+      // Get all tags for a user from unified system (with tagged_by info to show green vs grey)
       const username = url.searchParams.get("username");
       const viewerUsername = url.searchParams.get("viewer"); // Who's viewing (for relative coloring)
 
@@ -1700,16 +1870,17 @@ const server = Bun.serve({
       try {
         const stmt = db.prepare(`
           SELECT
-            t.tag,
-            t.tagged_by_user_id,
+            t.tag_name as tag,
+            t.source_user_id as tagged_by_user_id,
             u.username as tagged_by_username,
+            t.category,
             COUNT(*) as tag_count
-          FROM tags t
-          JOIN users u ON t.tagged_by_user_id = u.id
-          WHERE t.tagged_entity_type = 'user'
-            AND t.tagged_entity_id = (SELECT id FROM users WHERE username = ?)
-          GROUP BY t.tag, t.tagged_by_user_id, u.username
-          ORDER BY t.tag ASC
+          FROM tags_unified t
+          LEFT JOIN users u ON t.source_user_id = u.id
+          WHERE t.entity_type = 'user'
+            AND t.entity_id = (SELECT id FROM users WHERE username = ?)
+          GROUP BY t.tag_name, t.source_user_id, u.username, t.category
+          ORDER BY t.tag_name ASC
         `);
 
         const tags = stmt.all(username) as any[];
@@ -1721,8 +1892,9 @@ const server = Bun.serve({
             tagMap.set(t.tag, []);
           }
           tagMap.get(t.tag)?.push({
-            tagged_by_username: t.tagged_by_username,
-            is_viewer: viewerUsername ? t.tagged_by_username === viewerUsername : false
+            tagged_by_username: t.tagged_by_username || 'system',
+            is_viewer: viewerUsername ? t.tagged_by_username === viewerUsername : false,
+            category: t.category
           });
         });
 
@@ -1730,20 +1902,21 @@ const server = Bun.serve({
         const viewerTagsSet = new Set<string>();
         if (viewerUsername && viewerUsername !== username) {
           const viewerTagsStmt = db.prepare(`
-            SELECT DISTINCT tag
-            FROM tags
-            WHERE tagged_entity_type = 'user'
-              AND tagged_entity_id = (SELECT id FROM users WHERE username = ?)
+            SELECT DISTINCT tag_name
+            FROM tags_unified
+            WHERE entity_type = 'user'
+              AND entity_id = (SELECT id FROM users WHERE username = ?)
           `);
           const viewerTags = viewerTagsStmt.all(viewerUsername) as any[];
-          viewerTags.forEach(vt => viewerTagsSet.add(vt.tag));
+          viewerTags.forEach(vt => viewerTagsSet.add(vt.tag_name));
         }
 
         const result = Array.from(tagMap.entries()).map(([tag, taggedBy]) => ({
           tag,
           tagged_by: taggedBy,
           is_own_tag: taggedBy.some(t => t.tagged_by_username === username),
-          is_on_viewer_profile: viewerTagsSet.has(tag)
+          is_on_viewer_profile: viewerTagsSet.has(tag),
+          category: taggedBy[0]?.category || 'user_tag'
         }));
 
         return new Response(JSON.stringify({
@@ -1762,15 +1935,15 @@ const server = Bun.serve({
     }
 
     if (url.pathname === "/api/all-tags") {
-      // Get all unique tags in the system for autocomplete
+      // Get all unique tags in the system for autocomplete from unified system
       // Fixes #1: Tags Should Autocomplete
       try {
         const stmt = db.prepare(`
-          SELECT DISTINCT tag, COUNT(*) as usage_count
-          FROM tags
-          WHERE tagged_entity_type = 'user'
-          GROUP BY tag
-          ORDER BY usage_count DESC, tag ASC
+          SELECT DISTINCT tag_name as tag, COUNT(*) as usage_count
+          FROM tags_unified
+          WHERE entity_type = 'user'
+          GROUP BY tag_name
+          ORDER BY usage_count DESC, tag_name ASC
         `);
 
         const tags = stmt.all() as Array<{ tag: string; usage_count: number }>;
@@ -1790,15 +1963,16 @@ const server = Bun.serve({
     }
 
     if (url.pathname === "/api/add-tag" && req.method === "POST") {
-      // Add a tag to a user
+      // Add a tag to a user or repo using unified tag system
       try {
         const body = await req.json() as {
           tagged_username: string;
           tag: string;
           tagged_by_username: string;
+          repo_name?: string;  // Optional: if provided, tag the repo instead of the user
         };
 
-        const { tagged_username, tag, tagged_by_username } = body;
+        const { tagged_username, tag, tagged_by_username, repo_name } = body;
 
         if (!tagged_username || !tag || !tagged_by_username) {
           return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -1818,16 +1992,28 @@ const server = Bun.serve({
           });
         }
 
-        // Insert tag (UNIQUE constraint prevents duplicates)
+        // Determine entity type and prepare insertion
+        const entity_type = repo_name ? 'repo' : 'user';
+
+        // Insert tag into unified system (UNIQUE constraint prevents duplicates)
         const stmt = db.prepare(`
-          INSERT INTO tags (tagged_by_user_id, tagged_entity_type, tagged_entity_id, tag)
-          VALUES (?, 'user', ?, ?)
+          INSERT INTO tags_unified (
+            tag_name,
+            entity_type,
+            entity_id,
+            source_type,
+            source_user_id,
+            category,
+            repo_name,
+            confidence
+          )
+          VALUES (?, ?, ?, 'user', ?, 'user_tag', ?, 1.0)
           ON CONFLICT DO NOTHING
         `);
 
-        stmt.run(taggedByUser.id, taggedUser.id, tag);
+        stmt.run(tag, entity_type, taggedUser.id, taggedByUser.id, repo_name || null);
 
-        return new Response(JSON.stringify({ success: true, tag }), {
+        return new Response(JSON.stringify({ success: true, tag, entity_type, repo_name }), {
           headers: { "Content-Type": "application/json" }
         });
       } catch (error) {
@@ -1840,15 +2026,16 @@ const server = Bun.serve({
     }
 
     if (url.pathname === "/api/remove-tag" && req.method === "POST") {
-      // Remove a tag (only if the logged-in user added it)
+      // Remove a tag from unified system (only if the logged-in user added it)
       try {
         const body = await req.json() as {
           tagged_username: string;
           tag: string;
           logged_in_username: string;
+          repo_name?: string;  // Optional: if provided, remove from repo instead of user
         };
 
-        const { tagged_username, tag, logged_in_username } = body;
+        const { tagged_username, tag, logged_in_username, repo_name } = body;
 
         if (!tagged_username || !tag || !logged_in_username) {
           return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -1868,16 +2055,20 @@ const server = Bun.serve({
           });
         }
 
+        // Determine entity type
+        const entity_type = repo_name ? 'repo' : 'user';
+
         // Only delete if the logged-in user created this tag
         const stmt = db.prepare(`
-          DELETE FROM tags
-          WHERE tagged_by_user_id = ?
-            AND tagged_entity_type = 'user'
-            AND tagged_entity_id = ?
-            AND tag = ?
+          DELETE FROM tags_unified
+          WHERE source_user_id = ?
+            AND entity_type = ?
+            AND entity_id = ?
+            AND tag_name = ?
+            AND (? IS NULL OR repo_name = ?)
         `);
 
-        const result = stmt.run(loggedInUser.id, taggedUser.id, tag);
+        const result = stmt.run(loggedInUser.id, entity_type, taggedUser.id, tag, repo_name || null, repo_name || null);
 
         if (result.changes === 0) {
           return new Response(JSON.stringify({ error: "Tag not found or you don't have permission to remove it" }), {
@@ -1899,7 +2090,7 @@ const server = Bun.serve({
     }
 
     if (url.pathname === "/api/tag") {
-      // Get all users and repos with a specific tag
+      // Get all users and repos with a specific tag from unified system
       const tagName = url.searchParams.get("name");
 
       if (!tagName) {
@@ -1910,7 +2101,7 @@ const server = Bun.serve({
       }
 
       try {
-        // Get users with this tag
+        // Get users with this tag from unified system
         const usersStmt = db.prepare(`
           SELECT DISTINCT
             u.username,
@@ -1922,15 +2113,15 @@ const server = Bun.serve({
             END as user_type,
             COUNT(DISTINCT t.id) as tag_count
           FROM users u
-          JOIN tags t ON t.tagged_entity_id = u.id AND t.tagged_entity_type = 'user'
-          WHERE t.tag = ?
+          JOIN tags_unified t ON t.entity_id = u.id AND t.entity_type = 'user'
+          WHERE t.tag_name = ?
           GROUP BY u.id, u.username, u.avatar_url, u.access_token, u.scanned_by
           ORDER BY u.username ASC
         `);
 
         const users = usersStmt.all(tagName) as any[];
 
-        // Get repos with this tag (from tech stack or topics)
+        // Get repos with this tag from unified system
         const reposStmt = db.prepare(`
           SELECT DISTINCT
             r.name,
@@ -1941,13 +2132,12 @@ const server = Bun.serve({
             u.avatar_url
           FROM repositories r
           JOIN users u ON r.user_id = u.id
-          WHERE r.language = ? OR r.user_id IN (
-            SELECT user_id FROM tech_stack WHERE technology = ?
-          )
+          JOIN tags_unified t ON t.entity_type = 'repo' AND t.repo_name = r.name AND t.entity_id = r.user_id
+          WHERE t.tag_name = ?
           ORDER BY r.stars DESC, r.name ASC
         `);
 
-        const repos = reposStmt.all(tagName, tagName) as any[];
+        const repos = reposStmt.all(tagName) as any[];
 
         return new Response(JSON.stringify({
           tag: tagName,
@@ -2060,7 +2250,7 @@ const server = Bun.serve({
     }
 
     if (url.pathname === "/api/tech") {
-      // Get all repos and users for a specific technology
+      // Get all repos and users for a specific technology from unified system
       const tag = url.searchParams.get("tag");
 
       if (!tag) {
@@ -2071,7 +2261,7 @@ const server = Bun.serve({
       }
 
       try {
-        // Find repos with this technology (from tech_stack, ai_assistance, or services)
+        // Find repos with this technology from unified tags
         const reposStmt = db.prepare(`
           SELECT DISTINCT
             r.name,
@@ -2082,23 +2272,14 @@ const server = Bun.serve({
             u.avatar_url
           FROM repositories r
           JOIN users u ON r.user_id = u.id
-          WHERE r.user_id IN (
-            SELECT DISTINCT user_id FROM tech_stack WHERE technology = ?
-            UNION
-            SELECT DISTINCT user_id FROM ai_assistance WHERE ai_tool = ?
-            UNION
-            SELECT DISTINCT user_id FROM services WHERE service_name = ?
-          )
-          AND (
-            r.language = ?
-            OR r.user_id IN (SELECT user_id FROM tech_stack WHERE technology = ?)
-          )
+          JOIN tags_unified t ON t.entity_type = 'repo' AND t.repo_name = r.name AND t.entity_id = r.user_id
+          WHERE t.tag_name = ?
           ORDER BY r.stars DESC, r.name ASC
         `);
 
-        const repos = reposStmt.all(tag, tag, tag, tag, tag) as any[];
+        const repos = reposStmt.all(tag) as any[];
 
-        // Find users who use this technology
+        // Find users who use this technology from unified tags
         const usersStmt = db.prepare(`
           SELECT DISTINCT
             u.username,
@@ -2111,18 +2292,13 @@ const server = Bun.serve({
             END as user_type
           FROM users u
           LEFT JOIN repositories r ON r.user_id = u.id
-          WHERE u.id IN (
-            SELECT DISTINCT user_id FROM tech_stack WHERE technology = ?
-            UNION
-            SELECT DISTINCT user_id FROM ai_assistance WHERE ai_tool = ?
-            UNION
-            SELECT DISTINCT user_id FROM services WHERE service_name = ?
-          )
+          JOIN tags_unified t ON t.entity_type = 'user' AND t.entity_id = u.id
+          WHERE t.tag_name = ?
           GROUP BY u.id, u.username, u.avatar_url, u.access_token, u.scanned_by
           ORDER BY repo_count DESC, u.username ASC
         `);
 
-        const users = usersStmt.all(tag, tag, tag) as any[];
+        const users = usersStmt.all(tag) as any[];
 
         return new Response(JSON.stringify({
           tag,
@@ -2250,15 +2426,15 @@ const server = Bun.serve({
           relationships.push({ type: 'received_contribution', label: `Contributed to Your ${receivedContributions.count} Repo${receivedContributions.count > 1 ? 's' : ''}` });
         }
 
-        // Check for shared tags
+        // Check for shared tags from unified system
         const sharedTagsStmt = db.prepare(`
-          SELECT COUNT(DISTINCT t1.tag) as count
-          FROM tags t1
-          JOIN tags t2 ON t1.tag = t2.tag
-          WHERE t1.tagged_entity_type = 'user'
-            AND t2.tagged_entity_type = 'user'
-            AND t1.tagged_entity_id = (SELECT id FROM users WHERE username = ?)
-            AND t2.tagged_entity_id = (SELECT id FROM users WHERE username = ?)
+          SELECT COUNT(DISTINCT t1.tag_name) as count
+          FROM tags_unified t1
+          JOIN tags_unified t2 ON t1.tag_name = t2.tag_name
+          WHERE t1.entity_type = 'user'
+            AND t2.entity_type = 'user'
+            AND t1.entity_id = (SELECT id FROM users WHERE username = ?)
+            AND t2.entity_id = (SELECT id FROM users WHERE username = ?)
         `);
         const sharedTags = sharedTagsStmt.get(viewerUsername, profileUsername) as any;
         if (sharedTags.count > 0) {
@@ -2293,15 +2469,9 @@ const server = Bun.serve({
         const totalReposStmt = db.prepare("SELECT COUNT(*) as count FROM repositories");
         const totalRepos = (totalReposStmt.get() as any).count;
 
-        // Total unique technologies
+        // Total unique technologies from unified tags
         const totalTechStmt = db.prepare(`
-          SELECT COUNT(DISTINCT technology) as count FROM (
-            SELECT technology FROM tech_stack
-            UNION
-            SELECT ai_tool as technology FROM ai_assistance
-            UNION
-            SELECT service_name as technology FROM services
-          )
+          SELECT COUNT(DISTINCT tag_name) as count FROM tags_unified
         `);
         const totalTech = (totalTechStmt.get() as any).count;
 
@@ -2337,27 +2507,20 @@ const server = Bun.serve({
         `);
         const recentScanned = recentScannedStmt.all() as any[];
 
-        // Popular technologies (top 20) - includes user tags, AI tools, services, and tech stack
+        // Popular technologies (top 20) from unified tag system
         const popularTechStmt = db.prepare(`
           SELECT
-            tech as name,
-            user_count,
+            tag_name as name,
+            COUNT(DISTINCT entity_id) as user_count,
             CASE
-              WHEN tech IN (SELECT ai_tool FROM ai_assistance) THEN 'blue'
-              WHEN tech IN (SELECT service_name FROM services) THEN 'green'
-              WHEN tech IN (SELECT DISTINCT tag FROM tags WHERE tagged_entity_type = 'user') THEN 'blue'
+              WHEN category = 'ai_tool' THEN 'blue'
+              WHEN category = 'service' THEN 'green'
+              WHEN category = 'user_tag' THEN 'blue'
               ELSE 'gray'
             END as color
-          FROM (
-            SELECT technology as tech, COUNT(DISTINCT user_id) as user_count FROM tech_stack GROUP BY technology
-            UNION ALL
-            SELECT ai_tool as tech, COUNT(DISTINCT user_id) as user_count FROM ai_assistance GROUP BY ai_tool
-            UNION ALL
-            SELECT service_name as tech, COUNT(DISTINCT user_id) as user_count FROM services GROUP BY service_name
-            UNION ALL
-            SELECT tag as tech, COUNT(DISTINCT tagged_entity_id) as user_count FROM tags WHERE tagged_entity_type = 'user' GROUP BY tag
-          )
-          GROUP BY tech
+          FROM tags_unified
+          WHERE entity_type = 'user'
+          GROUP BY tag_name, category
           ORDER BY user_count DESC
           LIMIT 20
         `);
@@ -2397,22 +2560,22 @@ const server = Bun.serve({
 
     // Admin API endpoints for tag management
     if (url.pathname === "/api/admin/tags" && req.method === "GET") {
-      // Get all tags with metadata and usage counts
+      // Get all tags with metadata and usage counts from unified system
       try {
         const stmt = db.prepare(`
           WITH usage_counts AS (
-            SELECT technology as tech, 'tech' as source, COUNT(DISTINCT user_id) as user_count FROM tech_stack GROUP BY technology
-            UNION ALL
-            SELECT ai_tool as tech, 'ai' as source, COUNT(DISTINCT user_id) as user_count FROM ai_assistance GROUP BY ai_tool
-            UNION ALL
-            SELECT service_name as tech, 'tech' as source, COUNT(DISTINCT user_id) as user_count FROM services GROUP BY service_name
-            UNION ALL
-            SELECT tag as tech, 'user' as source, COUNT(DISTINCT tagged_entity_id) as user_count FROM tags WHERE tagged_entity_type = 'user' GROUP BY tag
+            SELECT
+              tag_name as tech,
+              category as source,
+              COUNT(DISTINCT entity_id) as user_count
+            FROM tags_unified
+            WHERE entity_type = 'user'
+            GROUP BY tag_name, category
           )
           SELECT
-            name,
-            type,
-            is_ai_stack,
+            tm.name,
+            COALESCE(tm.type, u.source) as type,
+            COALESCE(tm.is_ai_stack, 0) as is_ai_stack,
             COALESCE(u.user_count, 0) as usage_count
           FROM tag_metadata tm
           LEFT JOIN usage_counts u ON u.tech = tm.name
@@ -2434,7 +2597,7 @@ const server = Bun.serve({
             name: t.name,
             type: t.type,
             is_ai_stack: t.is_ai_stack === 1,
-            usage_count: t.user_count
+            usage_count: t.usage_count
           }))
         }), {
           headers: { "Content-Type": "application/json" }
@@ -2536,10 +2699,10 @@ const server = Bun.serve({
           `);
           stmt.run(is_ai_stack ? 1 : 0, tag);
         } else {
-          // Auto-detect type based on existing data
+          // Auto-detect type based on existing data in unified system
           let type = 'tech';
-          const aiCheck = db.prepare("SELECT 1 FROM ai_assistance WHERE ai_tool = ? LIMIT 1").get(tag);
-          const userTagCheck = db.prepare("SELECT 1 FROM tags WHERE tag = ? AND tagged_entity_type = 'user' LIMIT 1").get(tag);
+          const aiCheck = db.prepare("SELECT 1 FROM tags_unified WHERE tag_name = ? AND category = 'ai_tool' LIMIT 1").get(tag);
+          const userTagCheck = db.prepare("SELECT 1 FROM tags_unified WHERE tag_name = ? AND category = 'user_tag' LIMIT 1").get(tag);
 
           if (aiCheck) type = 'ai';
           else if (userTagCheck) type = 'user';
@@ -2564,7 +2727,7 @@ const server = Bun.serve({
     }
 
     if (url.pathname === "/api/admin/tags/rename" && req.method === "POST") {
-      // Rename a tag across all tables
+      // Rename a tag in unified system
       try {
         const body = await req.json() as { old_name: string; new_name: string };
         const { old_name, new_name } = body;
@@ -2579,10 +2742,8 @@ const server = Bun.serve({
         // Update in tag_metadata
         db.prepare("UPDATE tag_metadata SET name = ? WHERE name = ?").run(new_name, old_name);
 
-        // Update in tags table (user tags)
-        db.prepare("UPDATE tags SET tag = ? WHERE tag = ?").run(new_name, old_name);
-
-        // Note: We don't rename in tech_stack, ai_assistance, services as those come from GitHub
+        // Update in unified tags table
+        db.prepare("UPDATE tags_unified SET tag_name = ? WHERE tag_name = ?").run(new_name, old_name);
 
         return new Response(JSON.stringify({ success: true }), {
           headers: { "Content-Type": "application/json" }
