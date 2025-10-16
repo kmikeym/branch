@@ -42,6 +42,22 @@
       </div>
     </div>
 
+    <div class="landing-section" id="vibe-coding-section" style="margin-top: 40px;">
+      <h2>The AI Stack</h2>
+      <p style="color: #666; margin-bottom: 20px;">What's powering creative coding right now</p>
+      <div id="ai-stack-tech" class="tech-tags ai-stack-tags">
+        <div class="loading-placeholder">Loading...</div>
+      </div>
+    </div>
+
+    <div class="landing-section">
+      <h2>Featured Creators</h2>
+      <p style="color: #666; margin-bottom: 20px;">People building with AI tools</p>
+      <div id="featured-creators" class="social-grid">
+        <div class="loading-placeholder">Loading...</div>
+      </div>
+    </div>
+
     <div class="landing-stats">
       <div class="stat-card">
         <span class="stat-number" id="total-users">-</span>
@@ -74,14 +90,6 @@
         <div id="recent-scanned" class="social-grid">
           <div class="loading-placeholder">Loading...</div>
         </div>
-      </div>
-    </div>
-
-    <div class="landing-section" id="vibe-coding-section">
-      <h2>The AI Stack</h2>
-      <p style="color: #666; margin-bottom: 20px;">What's powering creative coding right now</p>
-      <div id="ai-stack-tech" class="tech-tags ai-stack-tags">
-        <div class="loading-placeholder">Loading...</div>
       </div>
     </div>
   </div>
@@ -253,9 +261,37 @@
           } else {
             aiStackContainer.innerHTML = '<p class="empty-state">No technologies yet. Be the first!</p>';
           }
+
+          // Load Featured Creators (Vibe Coders)
+          await loadFeaturedCreators();
         }
       } catch (error) {
         console.error('Failed to load stats:', error);
+      }
+    }
+
+    // Load Featured Creators (users tagged with "Vibe Coder")
+    async function loadFeaturedCreators() {
+      try {
+        const response = await fetch('/api/tag?name=Vibe%20Coder');
+        const data = await response.json();
+
+        const featuredContainer = document.getElementById('featured-creators');
+        if (data.users && data.users.length > 0) {
+          // Limit to 8 featured creators
+          const featured = data.users.slice(0, 8);
+          featuredContainer.innerHTML = featured.map(user => `
+            <a href="/dashboard.html?user=${user.username}" class="social-card" title="${user.username}">
+              <img src="${user.avatar_url}" alt="${user.username}" class="${user.user_type || 'unscanned'}">
+              <span>${user.username}</span>
+            </a>
+          `).join('');
+        } else {
+          featuredContainer.innerHTML = '<p class="empty-state">No AI creators yet. Be the first!</p>';
+        }
+      } catch (error) {
+        console.error('Failed to load featured creators:', error);
+        document.getElementById('featured-creators').innerHTML = '<p class="empty-state">Failed to load creators</p>';
       }
     }
 
