@@ -219,16 +219,20 @@
             recentScannedContainer.innerHTML = '<p class="empty-state">No scans yet</p>';
           }
 
-          // Fetch AI Stack tags from tag_metadata
+          // Fetch AI Stack tags from tag_metadata with their usage counts
           const aiStackResponse = await fetch('/api/admin/tags');
           const aiStackData = await aiStackResponse.json();
-          const aiStackNames = aiStackData.tags
-            .filter(t => t.is_ai_stack)
-            .map(t => t.name);
 
-          const aiStackTech = data.popular_tech.filter(tech =>
-            aiStackNames.includes(tech.name)
-          );
+          // Get tags marked as AI Stack with usage > 0
+          const aiStackTech = aiStackData.tags
+            .filter(t => t.is_ai_stack && t.usage_count > 0)
+            .map(t => ({
+              name: t.name,
+              user_count: t.usage_count,
+              // Determine color based on type
+              color: t.type === 'ai' || t.type === 'user' ? 'blue' : 'gray'
+            }))
+            .sort((a, b) => b.user_count - a.user_count);
 
           // Calculate size classes based on user count
           const maxCount = Math.max(...aiStackTech.map(t => t.user_count));
