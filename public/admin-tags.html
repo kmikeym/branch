@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tag Management - Branch</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .tag-management-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    .tag-management-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+
+    .tag-management-header h1 {
+      font-size: 2em;
+      color: #1a1a1a;
+    }
+
+    .tag-filters {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 8px 16px;
+      background: white;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9em;
+      transition: all 0.2s ease;
+    }
+
+    .filter-btn.active {
+      background: #1a1a1a;
+      color: white;
+      border-color: #1a1a1a;
+    }
+
+    .filter-btn:hover {
+      border-color: #1a1a1a;
+    }
+
+    .tag-table {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e5e5e5;
+      overflow: hidden;
+    }
+
+    .tag-table-header {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 150px;
+      gap: 16px;
+      padding: 16px 24px;
+      background: #fafafa;
+      border-bottom: 1px solid #e5e5e5;
+      font-weight: 600;
+      font-size: 0.9em;
+      color: #666;
+    }
+
+    .tag-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 150px;
+      gap: 16px;
+      padding: 16px 24px;
+      border-bottom: 1px solid #f0f0f0;
+      align-items: center;
+      transition: background 0.2s ease;
+    }
+
+    .tag-row:hover {
+      background: #fafafa;
+    }
+
+    .tag-row:last-child {
+      border-bottom: none;
+    }
+
+    .tag-name {
+      font-weight: 500;
+      color: #1a1a1a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tag-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75em;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .tag-badge.ai {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .tag-badge.tech {
+      background: #f3f4f6;
+      color: #666;
+    }
+
+    .tag-badge.user {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    .tag-usage {
+      color: #666;
+      font-size: 0.95em;
+    }
+
+    .tag-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tag-action-btn {
+      padding: 4px 12px;
+      border: 1px solid #e5e5e5;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      font-size: 0.85em;
+      transition: all 0.2s ease;
+    }
+
+    .tag-action-btn:hover {
+      border-color: #1a1a1a;
+      background: #fafafa;
+    }
+
+    .tag-action-btn.danger {
+      color: #dc2626;
+    }
+
+    .tag-action-btn.danger:hover {
+      border-color: #dc2626;
+      background: #fef2f2;
+    }
+
+    .tag-checkbox {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    .add-tag-section {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e5e5e5;
+      padding: 24px;
+      margin-bottom: 32px;
+    }
+
+    .add-tag-section h2 {
+      font-size: 1.3em;
+      margin-bottom: 16px;
+      color: #1a1a1a;
+    }
+
+    .add-tag-form {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-field label {
+      font-size: 0.9em;
+      color: #666;
+      font-weight: 500;
+    }
+
+    .form-field input,
+    .form-field select {
+      padding: 8px 12px;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+      font-size: 0.95em;
+    }
+
+    .form-field input {
+      min-width: 200px;
+    }
+
+    .stats-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card-small {
+      background: white;
+      border: 1px solid #e5e5e5;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .stat-card-small .label {
+      font-size: 0.85em;
+      color: #666;
+      margin-bottom: 8px;
+    }
+
+    .stat-card-small .value {
+      font-size: 2em;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    .empty-state-admin {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <a href="/" class="logo-link">
+        <span class="logo-icon">🌳</span>
+        <span class="logo-text">Branch</span>
+      </a>
+    </div>
+    <div class="nav-right">
+      <a href="/" style="color: #666; text-decoration: none; font-size: 0.9em;">← Back to Home</a>
+    </div>
+  </nav>
+
+  <div class="tag-management-container">
+    <div class="tag-management-header">
+      <h1>🏷️ Tag Management</h1>
+    </div>
+
+    <div class="stats-cards">
+      <div class="stat-card-small">
+        <div class="label">Total Tags</div>
+        <div class="value" id="total-tags">-</div>
+      </div>
+      <div class="stat-card-small">
+        <div class="label">AI Stack Tags</div>
+        <div class="value" id="ai-tags">-</div>
+      </div>
+      <div class="stat-card-small">
+        <div class="label">Tech Stack Tags</div>
+        <div class="value" id="tech-tags">-</div>
+      </div>
+      <div class="stat-card-small">
+        <div class="label">User Tags</div>
+        <div class="value" id="user-tags">-</div>
+      </div>
+    </div>
+
+    <div class="add-tag-section">
+      <h2>Add New Tag</h2>
+      <form class="add-tag-form" id="add-tag-form">
+        <div class="form-field">
+          <label for="new-tag-name">Tag Name</label>
+          <input type="text" id="new-tag-name" placeholder="e.g., Windsurf" required>
+        </div>
+        <div class="form-field">
+          <label for="new-tag-type">Type</label>
+          <select id="new-tag-type">
+            <option value="tech">Tech Stack</option>
+            <option value="ai">AI Tool</option>
+            <option value="user">User Tag</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>
+            <input type="checkbox" id="new-tag-ai-stack" style="margin-right: 6px;">
+            Show in AI Stack
+          </label>
+        </div>
+        <button type="submit" class="btn-primary">Add Tag</button>
+      </form>
+    </div>
+
+    <div class="tag-filters">
+      <button class="filter-btn active" data-filter="all">All Tags</button>
+      <button class="filter-btn" data-filter="ai-stack">AI Stack Only</button>
+      <button class="filter-btn" data-filter="tech">Tech Stack</button>
+      <button class="filter-btn" data-filter="ai">AI Tools</button>
+      <button class="filter-btn" data-filter="user">User Tags</button>
+    </div>
+
+    <div class="tag-table">
+      <div class="tag-table-header">
+        <div>Tag Name</div>
+        <div>Type</div>
+        <div>Usage Count</div>
+        <div>AI Stack</div>
+        <div>Actions</div>
+      </div>
+      <div id="tags-list">
+        <div class="empty-state-admin">Loading tags...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allTags = [];
+    let currentFilter = 'all';
+
+    // Load all tags on page load
+    async function loadTags() {
+      try {
+        const response = await fetch('/api/admin/tags');
+        const data = await response.json();
+        allTags = data.tags;
+        updateStats();
+        renderTags();
+      } catch (error) {
+        console.error('Failed to load tags:', error);
+        document.getElementById('tags-list').innerHTML = '<div class="empty-state-admin">Failed to load tags</div>';
+      }
+    }
+
+    function updateStats() {
+      const aiStackCount = allTags.filter(t => t.is_ai_stack).length;
+      const techCount = allTags.filter(t => t.type === 'tech').length;
+      const aiToolCount = allTags.filter(t => t.type === 'ai').length;
+      const userCount = allTags.filter(t => t.type === 'user').length;
+
+      document.getElementById('total-tags').textContent = allTags.length;
+      document.getElementById('ai-tags').textContent = aiStackCount;
+      document.getElementById('tech-tags').textContent = techCount;
+      document.getElementById('user-tags').textContent = userCount;
+    }
+
+    function renderTags() {
+      let filteredTags = allTags;
+
+      // Apply filter
+      if (currentFilter === 'ai-stack') {
+        filteredTags = allTags.filter(t => t.is_ai_stack);
+      } else if (currentFilter !== 'all') {
+        filteredTags = allTags.filter(t => t.type === currentFilter);
+      }
+
+      // Sort by usage count descending
+      filteredTags.sort((a, b) => b.usage_count - a.usage_count);
+
+      const tagsList = document.getElementById('tags-list');
+
+      if (filteredTags.length === 0) {
+        tagsList.innerHTML = '<div class="empty-state-admin">No tags match this filter</div>';
+        return;
+      }
+
+      tagsList.innerHTML = filteredTags.map(tag => `
+        <div class="tag-row" data-tag-name="${tag.name}">
+          <div class="tag-name">
+            ${tag.name}
+            <span class="tag-badge ${tag.type}">${tag.type}</span>
+          </div>
+          <div class="tag-type">${tag.type === 'tech' ? 'Tech Stack' : tag.type === 'ai' ? 'AI Tool' : 'User Tag'}</div>
+          <div class="tag-usage">${tag.usage_count} user${tag.usage_count !== 1 ? 's' : ''}</div>
+          <div>
+            <input
+              type="checkbox"
+              class="tag-checkbox"
+              ${tag.is_ai_stack ? 'checked' : ''}
+              onchange="toggleAIStack('${tag.name}', this.checked)"
+            >
+          </div>
+          <div class="tag-actions">
+            <button class="tag-action-btn" onclick="editTag('${tag.name}')">Edit</button>
+            <button class="tag-action-btn danger" onclick="deleteTag('${tag.name}')">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Filter buttons
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter;
+        renderTags();
+      });
+    });
+
+    // Add new tag
+    document.getElementById('add-tag-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const name = document.getElementById('new-tag-name').value.trim();
+      const type = document.getElementById('new-tag-type').value;
+      const isAIStack = document.getElementById('new-tag-ai-stack').checked;
+
+      try {
+        const response = await fetch('/api/admin/tags', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, type, is_ai_stack: isAIStack })
+        });
+
+        if (response.ok) {
+          // Clear form
+          document.getElementById('new-tag-name').value = '';
+          document.getElementById('new-tag-ai-stack').checked = false;
+
+          // Reload tags
+          await loadTags();
+          alert('Tag added successfully!');
+        } else {
+          const error = await response.json();
+          alert('Failed to add tag: ' + (error.error || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Failed to add tag:', error);
+        alert('Failed to add tag');
+      }
+    });
+
+    // Toggle AI Stack status
+    async function toggleAIStack(tagName, isEnabled) {
+      try {
+        const response = await fetch('/api/admin/tags/ai-stack', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tag: tagName, is_ai_stack: isEnabled })
+        });
+
+        if (response.ok) {
+          // Update local data
+          const tag = allTags.find(t => t.name === tagName);
+          if (tag) tag.is_ai_stack = isEnabled;
+          updateStats();
+        } else {
+          alert('Failed to update tag');
+          // Reload to reset checkbox
+          await loadTags();
+        }
+      } catch (error) {
+        console.error('Failed to update tag:', error);
+        alert('Failed to update tag');
+        await loadTags();
+      }
+    }
+
+    // Edit tag (rename)
+    async function editTag(tagName) {
+      const newName = prompt('Enter new name for tag:', tagName);
+      if (!newName || newName === tagName) return;
+
+      try {
+        const response = await fetch('/api/admin/tags/rename', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ old_name: tagName, new_name: newName })
+        });
+
+        if (response.ok) {
+          await loadTags();
+          alert('Tag renamed successfully!');
+        } else {
+          const error = await response.json();
+          alert('Failed to rename tag: ' + (error.error || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Failed to rename tag:', error);
+        alert('Failed to rename tag');
+      }
+    }
+
+    // Delete tag
+    async function deleteTag(tagName) {
+      if (!confirm(`Are you sure you want to delete the tag "${tagName}"? This will remove it from all users and repos.`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/admin/tags', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: tagName })
+        });
+
+        if (response.ok) {
+          await loadTags();
+          alert('Tag deleted successfully!');
+        } else {
+          const error = await response.json();
+          alert('Failed to delete tag: ' + (error.error || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Failed to delete tag:', error);
+        alert('Failed to delete tag');
+      }
+    }
+
+    // Load tags on page load
+    loadTags();
+  </script>
+</body>
+</html>

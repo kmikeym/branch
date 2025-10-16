@@ -219,16 +219,15 @@
             recentScannedContainer.innerHTML = '<p class="empty-state">No scans yet</p>';
           }
 
-          // Define AI Stack technologies (creative coding tools and AI-related)
-          const aiStackTools = [
-            'Claude', 'Claude Code', 'ChatGPT', 'GitHub Copilot', 'Cursor', 'Windsurf',
-            'Bun', 'Supabase', 'Next.js', 'Stable Diffusion', 'Processing', 'Three.js',
-            'TouchDesigner', 'Replicate', 'Fireproof', 'Cloudflare Workers',
-            'AI Assisted', 'Vibe Coder', 'React', 'TypeScript', 'Vercel', 'Tailwind CSS'
-          ];
+          // Fetch AI Stack tags from tag_metadata
+          const aiStackResponse = await fetch('/api/admin/tags');
+          const aiStackData = await aiStackResponse.json();
+          const aiStackNames = aiStackData.tags
+            .filter(t => t.is_ai_stack)
+            .map(t => t.name);
 
           const aiStackTech = data.popular_tech.filter(tech =>
-            aiStackTools.includes(tech.name)
+            aiStackNames.includes(tech.name)
           );
 
           // Calculate size classes based on user count

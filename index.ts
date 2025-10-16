@@ -175,6 +175,18 @@ db.run(`
   )
 `);
 
+// Tag metadata table for admin management
+db.run(`
+  CREATE TABLE IF NOT EXISTS tag_metadata (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    type TEXT NOT NULL,
+    is_ai_stack BOOLEAN DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
 console.log("✅ Database initialized");
 
 // Server configuration
@@ -2137,6 +2149,11 @@ const server = Bun.serve({
       return new Response(file);
     }
 
+    if (url.pathname === "/admin-tags.html") {
+      const file = Bun.file("./public/admin-tags.html");
+      return new Response(file);
+    }
+
     if (url.pathname === "/api/relationship") {
       // Get relationship between logged-in user and profile being viewed
       const viewerUsername = url.searchParams.get("viewer");
@@ -2360,6 +2377,199 @@ const server = Bun.serve({
       } catch (error) {
         console.error("Stats query error:", error);
         return new Response(JSON.stringify({ error: "Failed to fetch stats" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    // Admin API endpoints for tag management
+    if (url.pathname === "/api/admin/tags" && req.method === "GET") {
+      // Get all tags with metadata and usage counts
+      try {
+        const stmt = db.prepare(`
+          SELECT
+            COALESCE(tm.name, t.tech) as name,
+            COALESCE(tm.type, t.source) as type,
+            COALESCE(tm.is_ai_stack, 0) as is_ai_stack,
+            t.user_count as usage_count
+          FROM (
+            SELECT technology as tech, 'tech' as source, COUNT(DISTINCT user_id) as user_count FROM tech_stack GROUP BY technology
+            UNION ALL
+            SELECT ai_tool as tech, 'ai' as source, COUNT(DISTINCT user_id) as user_count FROM ai_assistance GROUP BY ai_tool
+            UNION ALL
+            SELECT service_name as tech, 'tech' as source, COUNT(DISTINCT user_id) as user_count FROM services GROUP BY service_name
+            UNION ALL
+            SELECT tag as tech, 'user' as source, COUNT(DISTINCT tagged_entity_id) as user_count FROM tags WHERE tagged_entity_type = 'user' GROUP BY tag
+          ) t
+          LEFT JOIN tag_metadata tm ON tm.name = t.tech
+          GROUP BY COALESCE(tm.name, t.tech)
+          ORDER BY t.user_count DESC
+        `);
+
+        const tags = stmt.all() as any[];
+
+        return new Response(JSON.stringify({
+          tags: tags.map(t => ({
+            name: t.name,
+            type: t.type,
+            is_ai_stack: t.is_ai_stack === 1,
+            usage_count: t.user_count
+          }))
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Admin tags query error:", error);
+        return new Response(JSON.stringify({ error: "Failed to fetch tags" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/api/admin/tags" && req.method === "POST") {
+      // Create new tag metadata
+      try {
+        const body = await req.json() as { name: string; type: string; is_ai_stack: boolean };
+        const { name, type, is_ai_stack } = body;
+
+        if (!name || !type) {
+          return new Response(JSON.stringify({ error: "Missing name or type" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        const stmt = db.prepare(`
+          INSERT INTO tag_metadata (name, type, is_ai_stack)
+          VALUES (?, ?, ?)
+          ON CONFLICT(name) DO UPDATE SET
+            type = excluded.type,
+            is_ai_stack = excluded.is_ai_stack,
+            updated_at = CURRENT_TIMESTAMP
+        `);
+
+        stmt.run(name, type, is_ai_stack ? 1 : 0);
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Add tag metadata error:", error);
+        return new Response(JSON.stringify({ error: "Failed to add tag" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/api/admin/tags" && req.method === "DELETE") {
+      // Delete tag metadata (this doesn't delete usage, just metadata)
+      try {
+        const body = await req.json() as { name: string };
+        const { name } = body;
+
+        if (!name) {
+          return new Response(JSON.stringify({ error: "Missing name" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        const stmt = db.prepare(`DELETE FROM tag_metadata WHERE name = ?`);
+        stmt.run(name);
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Delete tag metadata error:", error);
+        return new Response(JSON.stringify({ error: "Failed to delete tag" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/api/admin/tags/ai-stack" && req.method === "POST") {
+      // Toggle AI Stack status for a tag
+      try {
+        const body = await req.json() as { tag: string; is_ai_stack: boolean };
+        const { tag, is_ai_stack } = body;
+
+        if (!tag) {
+          return new Response(JSON.stringify({ error: "Missing tag" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Check if tag metadata exists, if not create it with default type
+        const existing = db.prepare("SELECT * FROM tag_metadata WHERE name = ?").get(tag) as any;
+
+        if (existing) {
+          const stmt = db.prepare(`
+            UPDATE tag_metadata
+            SET is_ai_stack = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE name = ?
+          `);
+          stmt.run(is_ai_stack ? 1 : 0, tag);
+        } else {
+          // Auto-detect type based on existing data
+          let type = 'tech';
+          const aiCheck = db.prepare("SELECT 1 FROM ai_assistance WHERE ai_tool = ? LIMIT 1").get(tag);
+          const userTagCheck = db.prepare("SELECT 1 FROM tags WHERE tag = ? AND tagged_entity_type = 'user' LIMIT 1").get(tag);
+
+          if (aiCheck) type = 'ai';
+          else if (userTagCheck) type = 'user';
+
+          const stmt = db.prepare(`
+            INSERT INTO tag_metadata (name, type, is_ai_stack)
+            VALUES (?, ?, ?)
+          `);
+          stmt.run(tag, type, is_ai_stack ? 1 : 0);
+        }
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Toggle AI stack error:", error);
+        return new Response(JSON.stringify({ error: "Failed to update tag" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+
+    if (url.pathname === "/api/admin/tags/rename" && req.method === "POST") {
+      // Rename a tag across all tables
+      try {
+        const body = await req.json() as { old_name: string; new_name: string };
+        const { old_name, new_name } = body;
+
+        if (!old_name || !new_name) {
+          return new Response(JSON.stringify({ error: "Missing old_name or new_name" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        // Update in tag_metadata
+        db.prepare("UPDATE tag_metadata SET name = ? WHERE name = ?").run(new_name, old_name);
+
+        // Update in tags table (user tags)
+        db.prepare("UPDATE tags SET tag = ? WHERE tag = ?").run(new_name, old_name);
+
+        // Note: We don't rename in tech_stack, ai_assistance, services as those come from GitHub
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { "Content-Type": "application/json" }
+        });
+      } catch (error) {
+        console.error("Rename tag error:", error);
+        return new Response(JSON.stringify({ error: "Failed to rename tag" }), {
           status: 500,
           headers: { "Content-Type": "application/json" }
         });
