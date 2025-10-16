@@ -2388,12 +2388,7 @@ const server = Bun.serve({
       // Get all tags with metadata and usage counts
       try {
         const stmt = db.prepare(`
-          SELECT
-            COALESCE(tm.name, t.tech) as name,
-            COALESCE(tm.type, t.source) as type,
-            COALESCE(tm.is_ai_stack, 0) as is_ai_stack,
-            t.user_count as usage_count
-          FROM (
+          WITH usage_counts AS (
             SELECT technology as tech, 'tech' as source, COUNT(DISTINCT user_id) as user_count FROM tech_stack GROUP BY technology
             UNION ALL
             SELECT ai_tool as tech, 'ai' as source, COUNT(DISTINCT user_id) as user_count FROM ai_assistance GROUP BY ai_tool
@@ -2401,10 +2396,23 @@ const server = Bun.serve({
             SELECT service_name as tech, 'tech' as source, COUNT(DISTINCT user_id) as user_count FROM services GROUP BY service_name
             UNION ALL
             SELECT tag as tech, 'user' as source, COUNT(DISTINCT tagged_entity_id) as user_count FROM tags WHERE tagged_entity_type = 'user' GROUP BY tag
-          ) t
-          LEFT JOIN tag_metadata tm ON tm.name = t.tech
-          GROUP BY COALESCE(tm.name, t.tech)
-          ORDER BY t.user_count DESC
+          )
+          SELECT
+            name,
+            type,
+            is_ai_stack,
+            COALESCE(u.user_count, 0) as usage_count
+          FROM tag_metadata tm
+          LEFT JOIN usage_counts u ON u.tech = tm.name
+          UNION
+          SELECT
+            u.tech as name,
+            u.source as type,
+            0 as is_ai_stack,
+            u.user_count as usage_count
+          FROM usage_counts u
+          WHERE NOT EXISTS (SELECT 1 FROM tag_metadata WHERE name = u.tech)
+          ORDER BY usage_count DESC
         `);
 
         const tags = stmt.all() as any[];
