@@ -250,36 +250,20 @@
             .filter(t => t.is_ai_stack)
             .map(t => ({
               name: t.name,
-              user_count: t.usage_count,
-              // Determine color based on type
-              color: t.type === 'ai' || t.type === 'user' ? 'blue' : 'gray'
+              // Tech tags = blue, User tags = green
+              color: t.type === 'user' ? 'green' : 'blue'
             }))
-            .sort((a, b) => b.user_count - a.user_count);
+            .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
 
-          // Calculate size classes based on user count
-          const maxCount = Math.max(...aiStackTech.map(t => t.user_count));
-          const minCount = Math.min(...aiStackTech.map(t => t.user_count));
-
-          const getSizeClass = (count) => {
-            const range = maxCount - minCount;
-            if (range === 0) return 'tech-tag-medium';
-            const normalized = (count - minCount) / range;
-            if (normalized > 0.66) return 'tech-tag-large';
-            if (normalized > 0.33) return 'tech-tag-medium';
-            return 'tech-tag-small';
-          };
-
-          // Display AI Stack technologies with dynamic sizing
+          // Display AI Stack technologies
           const aiStackContainer = document.getElementById('ai-stack-tech');
           if (aiStackTech && aiStackTech.length > 0) {
             aiStackContainer.innerHTML = aiStackTech.map(tech => {
-              const sizeClass = getSizeClass(tech.user_count);
               const isAITool = ['Claude', 'Claude Code', 'ChatGPT', 'GitHub Copilot', 'Cursor', 'Windsurf', 'AI Assisted', 'Vibe Coder'].includes(tech.name);
               return `
                 <a href="/tech.html?tag=${encodeURIComponent(tech.name)}"
-                   class="tech-tag tech-tag-${tech.color} ${sizeClass} ${isAITool ? 'ai-tool-tag' : ''}"
-                   data-count="${tech.user_count}">
-                  ${tech.name} <span class="tech-tag-count">${tech.user_count}</span>
+                   class="tech-tag tech-tag-${tech.color} ${isAITool ? 'ai-tool-tag' : ''}">
+                  ${tech.name}
                 </a>
               `;
             }).join('');
