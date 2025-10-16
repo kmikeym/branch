@@ -223,9 +223,9 @@
           const aiStackResponse = await fetch('/api/admin/tags');
           const aiStackData = await aiStackResponse.json();
 
-          // Get tags marked as AI Stack with usage > 0
+          // Get tags marked as AI Stack (show all, even with 0 usage)
           const aiStackTech = aiStackData.tags
-            .filter(t => t.is_ai_stack && t.usage_count > 0)
+            .filter(t => t.is_ai_stack)
             .map(t => ({
               name: t.name,
               user_count: t.usage_count,
