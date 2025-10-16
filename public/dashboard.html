@@ -669,6 +669,18 @@
         scanMoreBtn.classList.add('hidden');
       }
 
+      // Fetch AI Stack tags to check repos against
+      let aiStackTags = [];
+      try {
+        const aiStackResponse = await fetch('/api/admin/tags');
+        const aiStackData = await aiStackResponse.json();
+        aiStackTags = aiStackData.tags
+          .filter(t => t.is_ai_stack)
+          .map(t => t.name.toLowerCase());
+      } catch (error) {
+        console.error('Failed to load AI Stack tags:', error);
+      }
+
       // Display repositories
       const reposContainer = document.getElementById('repositories');
       if (techData.repositories && techData.repositories.length > 0) {
@@ -693,8 +705,37 @@
                   style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; margin-left: -8px;">`
           ).join('');
 
+          // Check if repo uses any AI Stack technology
+          const repoTech = [];
+          // Collect all tech for this repo from different sources
+          if (repo.language) repoTech.push(repo.language.toLowerCase());
+
+          // Check tech_stack, ai_assistance, and services for this repo
+          techData.tech_stack.forEach(t => {
+            if (t.repos && t.repos.includes(repo.name)) {
+              repoTech.push(t.technology.toLowerCase());
+            }
+          });
+          if (techData.ai_assistance) {
+            techData.ai_assistance.forEach(ai => {
+              if (ai.repos && ai.repos.includes(repo.name)) {
+                repoTech.push(ai.tool.toLowerCase());
+              }
+            });
+          }
+          if (techData.services) {
+            techData.services.forEach(service => {
+              if (service.repos && service.repos.includes(repo.name)) {
+                repoTech.push(service.service.toLowerCase());
+              }
+            });
+          }
+
+          // Check if any repo tech matches AI Stack tags
+          const hasAIStackTech = repoTech.some(tech => aiStackTags.includes(tech));
+
           return `
-          <div class="repo-item">
+          <div class="repo-item" style="${hasAIStackTech ? 'border-left: 3px solid #15803d;' : ''}">
             <div class="repo-header">
               <a href="#" class="repo-name" data-repo-index="${index}" onclick="openForkModal(event, ${index})">${repo.name}</a>
               <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
