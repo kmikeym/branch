@@ -1337,9 +1337,10 @@ const server = Bun.serve({
 
       const techResults = techStmt.all(username) as any[];
 
-      // Get AI assistance data
+      // Get AI assistance data with repo lists
       const aiStmt = db.prepare(`
-        SELECT ai_tool, COUNT(DISTINCT repo_name) as repo_count, SUM(mention_count) as total_mentions
+        SELECT ai_tool, COUNT(DISTINCT repo_name) as repo_count, SUM(mention_count) as total_mentions,
+               GROUP_CONCAT(DISTINCT repo_name) as repos
         FROM ai_assistance
         WHERE user_id = (SELECT id FROM users WHERE username = ?)
         GROUP BY ai_tool
@@ -1347,6 +1348,10 @@ const server = Bun.serve({
       `);
 
       const aiResults = aiStmt.all(username) as any[];
+      // Split comma-separated repos into arrays
+      aiResults.forEach(ai => {
+        ai.repos = ai.repos ? ai.repos.split(',') : [];
+      });
 
       // Get services data
       const servicesStmt = db.prepare(`
@@ -1358,15 +1363,22 @@ const server = Bun.serve({
 
       const servicesResults = servicesStmt.all(username) as any[];
 
-      // Get repositories
+      // Get repositories with their AI assistance tools
       const reposStmt = db.prepare(`
-        SELECT name, description, language, stars, url
-        FROM repositories
-        WHERE user_id = (SELECT id FROM users WHERE username = ?)
-        ORDER BY stars DESC, name ASC
+        SELECT r.name, r.description, r.language, r.stars, r.url,
+               GROUP_CONCAT(DISTINCT a.ai_tool) as ai_tools
+        FROM repositories r
+        LEFT JOIN ai_assistance a ON a.repo_name = r.name AND a.user_id = r.user_id
+        WHERE r.user_id = (SELECT id FROM users WHERE username = ?)
+        GROUP BY r.name
+        ORDER BY r.stars DESC, r.name ASC
       `);
 
       const reposResults = reposStmt.all(username) as any[];
+      // Split comma-separated AI tools into arrays
+      reposResults.forEach(repo => {
+        repo.ai_tools = repo.ai_tools ? repo.ai_tools.split(',') : [];
+      });
 
       // Get followers with their user type
       const followersStmt = db.prepare(`

@@ -707,27 +707,16 @@
 
           // Check if repo uses any AI Stack technology
           const repoTech = [];
-          // Collect all tech for this repo from different sources
-          if (repo.language) repoTech.push(repo.language.toLowerCase());
 
-          // Check tech_stack, ai_assistance, and services for this repo
-          techData.tech_stack.forEach(t => {
-            if (t.repos && t.repos.includes(repo.name)) {
-              repoTech.push(t.technology.toLowerCase());
-            }
-          });
-          if (techData.ai_assistance) {
-            techData.ai_assistance.forEach(ai => {
-              if (ai.repos && ai.repos.includes(repo.name)) {
-                repoTech.push(ai.tool.toLowerCase());
-              }
-            });
+          // Add language
+          if (repo.language) {
+            repoTech.push(repo.language.toLowerCase());
           }
-          if (techData.services) {
-            techData.services.forEach(service => {
-              if (service.repos && service.repos.includes(repo.name)) {
-                repoTech.push(service.service.toLowerCase());
-              }
+
+          // Add AI tools
+          if (repo.ai_tools && repo.ai_tools.length > 0) {
+            repo.ai_tools.forEach(tool => {
+              if (tool) repoTech.push(tool.toLowerCase());
             });
           }
 
