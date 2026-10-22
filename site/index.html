@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Branch - Mapping the creative network of code</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .archive-note {
+      max-width: 800px;
+      margin: 32px auto 0;
+      padding: 24px 28px;
+      background: #fffbe6;
+      border: 1px solid #f0d878;
+      border-radius: 8px;
+      color: #333;
+      line-height: 1.6;
+    }
+    .archive-note h2 { margin: 0 0 12px 0; font-size: 1.2em; color: #1a1a1a; }
+    .archive-note p { margin: 0 0 12px 0; }
+    .archive-note p:last-child { margin-bottom: 0; }
+    .archive-note a { color: #1a1a1a; border-bottom: 1px solid #c9b45a; text-decoration: none; }
+    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; }
+    .feature-grid h3 { margin: 0 0 8px 0; font-size: 1.1em; }
+    .feature-grid p { margin: 0; color: #666; }
+    @media (max-width: 600px) { .landing-hero h1 { font-size: 2.2em; } }
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <div class="nav-left">
+      <div class="logo-link" style="cursor: default;">
+        <span class="logo-icon">🌳</span>
+        <span class="logo-text">Branch</span>
+      </div>
+    </div>
+    <div class="nav-right">
+      <a href="https://github.com/kmikeym/branch" class="btn-secondary" style="text-decoration: none;">Source on GitHub</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="archive-note">
+      <h2>Branch ran from October 2025 to October 2026. This page is what remains.</h2>
+      <p>Branch was a social network built on top of GitHub. You signed in, it read your followers and the people you followed, then walked outward through their networks to find the developers your circle had in common that you had not met yet. It tagged everyone by the tools in their public repos, with a particular eye on who was building with AI.</p>
+      <p>It was one of my first AI-assisted builds: Claude Code, Bun, and a SQLite file, shipped in a few weeks in the fall of 2025. The app is retired and the database is gone, but the idea still holds. GitHub is already a social graph; it just does not act like one. The <a href="https://github.com/kmikeym/branch">code is public</a>.</p>
+    </div>
+
+    <div class="landing-hero">
+      <h1>Mapping the creative network of code.</h1>
+      <p class="landing-tagline">Branch connected people building at the intersection of AI and code: developers who experiment, remix, and create new tools.</p>
+    </div>
+
+    <div class="landing-section">
+      <h2>What it did</h2>
+      <div class="feature-grid">
+        <div>
+          <h3>Scan your GitHub</h3>
+          <p>Sign in with GitHub and Branch pulled your followers, following, and public repos.</p>
+        </div>
+        <div>
+          <h3>Find hidden influencers</h3>
+          <p>A breadth-first walk through your network surfaced the people most of your connections already followed, ranked by mutual connections.</p>
+        </div>
+        <div>
+          <h3>Tag by tech stack</h3>
+          <p>Languages, frameworks and services from each repo became tags, so you could browse everyone using a given tool.</p>
+        </div>
+        <div>
+          <h3>The AI stack</h3>
+          <p>Claude, Copilot, Cursor and the rest were tracked as their own layer: who was building with what, and who was vibe coding.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer style="background: #fafafa; border-top: 1px solid #e5e5e5; padding: 48px 20px; margin-top: 80px;">
+    <div style="max-width: 800px; margin: 0 auto; text-align: center;">
+      <div style="margin-bottom: 24px;">
+        <h3 style="font-size: 1.5em; margin: 0 0 8px 0; color: #1a1a1a;">Branch</h3>
+        <p style="color: #666; font-size: 1em; margin: 0;">Mapping the creative network of code.</p>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <p style="color: #999; font-size: 0.9em; margin: 0;">
+          Built with <a href="https://bun.sh" target="_blank" rel="noopener noreferrer" style="color: #666; text-decoration: none; border-bottom: 1px solid #ddd;">Bun</a> ·
+          Powered by <a href="https://github.com" target="_blank" rel="noopener noreferrer" style="color: #666; text-decoration: none; border-bottom: 1px solid #ddd;">GitHub</a> ·
+          Retired October 2026.
+        </p>
+      </div>
+
+      <div style="color: #999; font-size: 0.85em;">
+        <p style="margin: 0;">© 2025 to 2026 Quarterly Systems</p>
+        <p style="margin: 4px 0 0 0;">a <a href="https://kmikeym.com" target="_blank" rel="noopener noreferrer" style="color: #999; text-decoration: none; border-bottom: 1px solid #ddd;">K5M</a> company</p>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

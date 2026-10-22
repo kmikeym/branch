@@ -8,5 +8,6 @@
   },
   "peerDependencies": {
     "typescript": "^5"
-  }
+  },
+  "license": "CC0-1.0"
 }

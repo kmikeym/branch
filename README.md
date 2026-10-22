@@ -1,5 +1,7 @@
 # 🌳 Branch
 
+> **Retired October 2026.** Branch ran at branch.quarterly.systems from October 2025 to October 2026. The app is shut down and the database is gone; a static landing page now lives at the same address (`site/`, served by Cloudflare Pages). Everything below describes the app as it ran.
+
 **Discover what technologies you actually use.**
 
 Branch analyzes your GitHub repositories to show you a complete picture of your tech stack - languages, frameworks, and tools you work with most.
@@ -342,7 +344,7 @@ See [CLAUDE.md](CLAUDE.md) for detailed project context and instructions.
 
 ## License
 
-MIT
+CC0 1.0 Universal (public domain dedication). See `LICENSE`.
 
 ---
 
